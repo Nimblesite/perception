@@ -20,7 +20,7 @@ module NoteCache
 
     // A new track has the same content address in the player and every maker, even before its folder exists.
     home (folder, entries, text) = match ui::Lists::find (entries, \dir => endsWith dir "/" && labelled (dir, text))
-        Error _ => "${folder}/notes/${registry::Sha256::ofString text}"
+        Error _ => "${folder}/notes/${digest::Sha256::ofString text}"
         Success dir => take dir (satSub (length dir) 1)
 
     folders (keys, folder) =

@@ -8,7 +8,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 tag=$(tr -d '[:space:]' < "$here/scripts/osprey-version")
 dest=$here/src/osprey/packages
-packages=(native signal_flow graphics json uitest manager/core)
+packages=(native signal_flow graphics json uitest)
 [ "$(cat "$dest/.tag" 2>/dev/null)" = "$tag" ] && exit 0
 fetch=$(mktemp -d)
 trap 'rm -rf "$fetch"' EXIT

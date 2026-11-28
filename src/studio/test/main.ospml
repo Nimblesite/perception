@@ -1284,3 +1284,5 @@ hostedTest ("A held mix fader, the following note, Undo and Redo affect the play
 hostedTest ("Send level edits and cancellation reach a held note while the project stays saved", liveSendJourney)
 
 journeyTest ("two note makers share a song's distinct notes once, keep them for the next pass and sweep an edited instrument's folder", makerJourney)
+
+test ("the note cache's content address is the FIPS 180-4 SHA-256 of the key", \() => Runtime::guarded digestJourney)
