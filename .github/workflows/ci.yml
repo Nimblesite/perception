@@ -45,7 +45,7 @@ jobs:
       # [CI-LINT] Every Perception project with warnings as errors, and every Osprey source formatted.
       - name: Lint Osprey
         run: make -f scripts/make/perception.mk lint
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.4.0
       - name: Install deslop
         run: bash scripts/ci/install-deslop.sh "$RUNNER_TEMP/bin"
       # [CI-LINT] paths, shell, Python, C/C++, JavaScript and the duplication gate, at pinned tool versions.
