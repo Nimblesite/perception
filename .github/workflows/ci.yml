@@ -44,7 +44,7 @@ jobs:
           make _check_programs
       # [CI-LINT] Every Perception project with warnings as errors, and every Osprey source formatted.
       - name: Lint Osprey
-        run: make -f scripts/make/perception.mk lint
+        run: make -f scripts/make/perception.mk perception-lint
       - uses: astral-sh/setup-uv@v10.4.0
       - name: Install deslop
         run: bash scripts/ci/install-deslop.sh "$RUNNER_TEMP/bin"
@@ -149,7 +149,7 @@ jobs:
       - *checkout
       - *workspace
       - name: Build and test the worker
-        run: make -f scripts/make/perception.mk _synth_vst_test
+        run: make -f scripts/make/perception.mk synth-vst
 
   # Reads the reports the test jobs wrote; runs nothing.
   coverage:

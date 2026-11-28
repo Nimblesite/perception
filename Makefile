@@ -18,7 +18,7 @@ studio: _workspace
 
 ## lint: Every check but the tests: warnings as errors, formatting of every language, paths, duplication.
 lint: _workspace
-	$(RUN) lint
+	$(RUN) perception-lint
 	scripts/lint.sh
 
 ## test: The canary: synth package and Studio journeys, the song renderer, and the macOS host smoke.
