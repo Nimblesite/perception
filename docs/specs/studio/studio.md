@@ -154,6 +154,8 @@ A song is one JSON file, and nothing about a song lives anywhere else. Its root 
 
 **Start latency ([DAW-TRANSPORT-LIVE-LATENCY]).** Play buffers 5 to 10 ms of audio before the device starts, and no more: at 48 kHz that is 240 to 480 frames. The first sound follows the Play command by that buffer plus the device's own output latency. Interactive playback primes the adapter with two 160-frame blocks (6.67 ms of audio). The producer flushes each block and waits for the adapter’s receipt before sending another. Project loading, rendering and device startup also contribute to the measured Play-to-sound time.
 
+**Non-goal: faster live playback ([DAW-TRANSPORT-LIVE-LATENCY]).** Speeding up live playback (the device cadence, queue latency or producer priority) is not a goal now. The VST3 worker's `audio_device_cadence` journey fails on shared runners because its producer stalls past the 20 ms queue; that is recorded here, not tuned. New code for it is Osprey, never C++.
+
 **MIDI clock ([DAW-TRANSPORT-MIDI-CLOCK]).** Playing is synchronised with the MIDI clock. The transport is one clock in beats, and audio, the playhead and MIDI all read it.
 
 1. **Sending.** While the song plays, the daw sends MIDI timing clock (0xF8, 24 per quarter note) from the same sample clock that drives the audio, so an external sequencer, drum machine or arpeggiator stays in time with what is heard. Play from the song's first beat sends Start (0xFA); Play from any other start marker sends Song Position Pointer (0xF2, in sixteenth notes) and then Continue (0xFB); Stop sends Stop (0xFC). A loop sends Song Position Pointer at each return to the start marker.

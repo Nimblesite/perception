@@ -9,6 +9,8 @@
 - 📜 Logging = an effect via the standard Osprey package. ❌ logs in the repo root
 
 ## 🐦 Osprey
+- 🚫 C++ banned: new code is Osprey only. ❌ write or grow C/C++ (the legacy VST3 worker included)
+- ⏱️ Non-goal: speeding up live playback (device cadence, queue latency, producer priority) [DAW-TRANSPORT-LIVE-LATENCY]. ❌ tune it
 - 🛠️ Compiler: use what's installed. 1️⃣ the VS Code extension's bundled one (`~/.vscode/extensions/nimblesite.osprey-<version>-<platform>/bin/<platform>/osprey`), 2️⃣ `brew install nimblesite/tap/osprey` (macOS/Linux) or `scoop install osprey` (Windows, [bucket](https://github.com/Nimblesite/scoop-bucket)). ❌ build ospreylang just to run a program. [Install](https://www.ospreylang.dev/docs/installation/)
 - 📖 Learn it: [docs](https://www.ospreylang.dev/docs/) · [first app](https://www.ospreylang.dev/docs/my-first-app/) · [types](https://www.ospreylang.dev/docs/types/) · [functions](https://www.ospreylang.dev/docs/functions/) · [operators](https://www.ospreylang.dev/docs/operators/) · [keywords](https://www.ospreylang.dev/docs/keywords/) · [stdlib](https://www.ospreylang.dev/docs/stdlib/)
 - ⚡ Effects = how Osprey does I/O and testing: [effects](https://www.ospreylang.dev/docs/effects/)
