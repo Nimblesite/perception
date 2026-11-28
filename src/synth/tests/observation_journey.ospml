@@ -10,7 +10,7 @@ knobSnapshotJourney () =
     graph = sineThrough 0.5
     initial = Parameters::initial graph
     slot = SnapshotSlots::initial initial
-    edit = synth::ParameterChange(node = 2, key = "gain", value = 0.75, revision = 0, samplePosition = 0)
+    edit = editAt (2, "gain", 0.75, 0)
     valid (Parameters::apply (graph, initial, edit), \first =>
         valid (Parameters::apply (graph, first, edit(revision = 1, value = 0.25)), \second =>
             latest = SnapshotSlots::read (SnapshotSlots::publish (SnapshotSlots::publish (slot, first), second))

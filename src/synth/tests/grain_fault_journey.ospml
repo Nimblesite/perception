@@ -24,5 +24,4 @@ grainFaultJourney (node, cloud) =
     succeeds (Grains::block (cloud.pool, 4), \block =>
         current = displayedGrains (Grains::observation block.next)
         expect (current.samplePosition, 4)
-        expect (current.capacity, quiet.capacity)
-        expect (current.sourceFrames, quiet.sourceFrames))
+        exactRows ([{ got = current.capacity, want = quiet.capacity }, { got = current.sourceFrames, want = quiet.sourceFrames }]))

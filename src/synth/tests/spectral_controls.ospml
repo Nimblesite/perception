@@ -3,7 +3,7 @@ import synth::Parameters
 import synth::SpectralKernels
 
 // [SYNTH-ADVANCED-SPECTRAL-MODULES] Decode front-panel settings against the current parameter snapshot.
-spectralControl (n, fixed) = SpectralKernels::prepare (48000.0, Parameters::initial (serial ([Components::sine (1, 440.0), n, Components::output 3])), n.identity, n.processor, fixed)
+spectralControl (n, fixed) = SpectralKernels::prepare (48000.0, Parameters::initial (through n), n.identity, n.processor, fixed)
 
 spectralTransform (n, wanted) = match spectralControl (n, true)
     synth::FixedSpectrum config => sameStructure (config.transform, wanted)
@@ -19,5 +19,4 @@ spectralControlJourney () =
     sameStructure (spectralControl (pitch, false), synth::LiveSpectrum)
     forEachList ([grainSet (morph, "morphMode", 1.5), grainSet (morph, "transform", 0.5)], \bad =>
         sameStructure (spectralControl (bad, true), synth::LiveSpectrum)
-        graph = serial ([Components::sine (1, 440.0), bad, Components::output 3])
-        renderRefused (synth::Renderer::block (planFor graph, 48000.0, Parameters::initial graph, rendered (synth::Renderer::start graph), 16)))
+        renderRefusedFrom (through bad, 16))

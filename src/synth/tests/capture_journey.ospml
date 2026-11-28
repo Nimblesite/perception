@@ -7,17 +7,20 @@ import synth::Outcomes
 // [SYNTH-RENDER-BLOCKS] A send's tap collects the selected node from the same frames that feed the sink.
 captureNode (identity, samples, frame) = Outcomes::carried (RenderInputs::sample (frame, identity), \value => Success(value = listAppend samples value))
 
+// A capture of `frames` frames from `from`, tapping `node`.
+captured (plan, controls, from, frames, node) = Renderer::capture (plan, 48000.0, controls, from, frames, \(seen, frame) => captureNode (node, seen, frame))
+
 sendCaptureJourney () =
-    source = Components::samplePlayer (1, grainResource (48000, 440.0, [1.0, 0.5, -1.0, -0.5]))
+    source = Components::samplePlayer (1, stepSource ())
     graph = serial ([source, Components::gain (2, 0.5), Components::output 3])
     plan = planFor graph
     controls = Parameters::initial graph
     start = synth::Timeline(audio = rendered (Renderer::start graph), observation = [])
     forEachList ([{ node = 1, want = [1.0, 0.5, -1.0, -0.5] }, { node = 2, want = [0.5, 0.25, -0.5, -0.25] }], \row =>
-        succeeds (Renderer::capture (plan, 48000.0, controls, start, 2, \(seen, frame) => captureNode (row.node, seen, frame)), \head =>
-            succeeds (Renderer::capture (plan, 48000.0, controls, head, 2, \(seen, frame) => captureNode (row.node, seen, frame)), \done =>
+        succeeds (captured (plan, controls, start, 2, row.node), \head =>
+            succeeds (captured (plan, controls, head, 2, row.node), \done =>
                 expect (done.audio.position, 4)
                 sameSamples (done.observation, row.want))))
-    renderRefused (Renderer::capture (plan, 48000.0, controls, start, 1, \(seen, frame) => captureNode (99, seen, frame)))
-    succeeds (Renderer::capture (plan, 48000.0, controls, start, 0, \(seen, frame) => captureNode (1, seen, frame)), \unchanged => sameStructure (unchanged, start))
-    renderRefused (Renderer::capture (plan, 48000.0, controls, start, -1, \(seen, frame) => captureNode (1, seen, frame)))
+    renderRefused (captured (plan, controls, start, 1, 99))
+    succeeds (captured (plan, controls, start, 0, 1), \unchanged => sameStructure (unchanged, start))
+    renderRefused (captured (plan, controls, start, -1, 1))
