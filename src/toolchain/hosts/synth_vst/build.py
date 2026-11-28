@@ -760,6 +760,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device-test", action="store_true")
     parser.add_argument("--test", action="store_true")
+    parser.add_argument("--live-latency", action="store_true")
     parser.add_argument("--stream-test", action="store_true")
     parser.add_argument("--studio-test", type=pathlib.Path)
     parser.add_argument("--design-test", type=pathlib.Path)
@@ -789,7 +790,7 @@ def main():
     )
     targets = (
         ["osprey-vst-worker", "adelay", "mda-vst3"]
-        if args.test
+        if args.test or args.live_latency
         else ["osprey-vst-worker"]
     )
     run(
@@ -802,8 +803,17 @@ def main():
         *targets,
         timeout=600,
     )
-    if args.test:
-        run("ctest", "--test-dir", str(BUILD), "--output-on-failure", timeout=120)
+    if args.test or args.live_latency:
+        # [DAW-TRANSPORT-LIVE-LATENCY] The 20 ms live-latency journey is a non-goal: run it with --live-latency.
+        label = ("-L" if args.live_latency else "-LE", "live-latency")
+        run(
+            "ctest",
+            "--test-dir",
+            str(BUILD),
+            "--output-on-failure",
+            *label,
+            timeout=120,
+        )
 
 
 if __name__ == "__main__":

@@ -154,7 +154,7 @@ A song is one JSON file, and nothing about a song lives anywhere else. Its root 
 
 **Start latency ([DAW-TRANSPORT-LIVE-LATENCY]).** Play buffers 5 to 10 ms of audio before the device starts, and no more: at 48 kHz that is 240 to 480 frames. The first sound follows the Play command by that buffer plus the device's own output latency. Interactive playback primes the adapter with two 160-frame blocks (6.67 ms of audio). The producer flushes each block and waits for the adapter’s receipt before sending another. Project loading, rendering and device startup also contribute to the measured Play-to-sound time.
 
-**Non-goal: faster live playback ([DAW-TRANSPORT-LIVE-LATENCY]).** Speeding up live playback (the device cadence, queue latency or producer priority) is not a goal now. The VST3 worker's `audio_device_cadence` journey fails on shared runners because its producer stalls past the 20 ms queue; that is recorded here, not tuned. New code for it is Osprey, never C++.
+**Non-goal: faster live playback ([DAW-TRANSPORT-LIVE-LATENCY]).** Speeding up live playback (the device cadence, queue latency or producer priority) is not a goal now. The VST3 worker's `audio_device_cadence` journey fails on shared runners because its producer stalls past the 20 ms queue; that is recorded here, not tuned, so it carries the `live-latency` label, CI's VST3 job leaves it out, and `build.py --live-latency` runs it alone. New code for it is Osprey, never C++.
 
 **MIDI clock ([DAW-TRANSPORT-MIDI-CLOCK]).** Playing is synchronised with the MIDI clock. The transport is one clock in beats, and audio, the playhead and MIDI all read it.
 

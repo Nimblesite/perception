@@ -63,13 +63,17 @@ synth-headless:
 	$(DAW_MAKE) _studio_ui_test GPUI_WINDOW=--headless
 
 ## _vst_worker_build: Build Perception Modular from the pinned official SDK.
-.PHONY: _vst_worker_build _vst_worker_test
+.PHONY: _vst_worker_build _vst_worker_test _vst_worker_live_latency
 _vst_worker_build:
 	python3 src/toolchain/hosts/synth_vst/build.py
 
 ## _vst_worker_test: Scan and process real SDK instruments/effects without a window or audio device.
 _vst_worker_test:
 	python3 src/toolchain/hosts/synth_vst/build.py --test
+
+## _vst_worker_live_latency: The 20 ms live-latency journey alone; a non-goal, so not in CI [DAW-TRANSPORT-LIVE-LATENCY].
+_vst_worker_live_latency:
+	python3 src/toolchain/hosts/synth_vst/build.py --live-latency
 
 ## synth-proofs: [SYNTH-DSP-PROOFS] Every Synthesis theorem, then every production FFT, spectral-frame and
 ##               waveshaper theorem derived from src/synth and src/studio, replays in the Osprey kernel built
