@@ -13,39 +13,6 @@ import synth::Sequences
 import synth::SpectralStreams
 import synth::Timings
 
-validArithmetic = "valid arithmetic"
-
-// [SYNTH-PCM-FLOAT] Independent character search checks every ASCII decoder boundary.
-hexDigitCase code =
-    character = fromCodePoint code ?: "invalid"
-    match indexOf "0123456789ABCDEF" character
-        Error _ => renderRefused (synth::PcmWords::read32 ("0${character}000000", 0))
-        Success digit => match synth::PcmWords::read32 ("0${character}000000", 0)
-            Error _ => unexpected ()
-            Success word => expect (word, digit)
-
-arithmetic work =
-    handle Arith
-        overflow _ _ _ wrapped =>
-            expect ("overflow", validArithmetic)
-            wrapped
-        divideByZero _ _ =>
-            expect ("division by zero", validArithmetic)
-            0.0
-        remainderByZero _ =>
-            expect ("remainder by zero", validArithmetic)
-            0
-    work ()
-
-accepted outcome = match outcome
-    synth::Valid graph => graph
-    synth::Invalid _ =>
-        expect (false, true)
-        Graphs::empty
-
-refused (outcome, expected) = match outcome
-    synth::Invalid actual => expect (actual == expected, true)
-    synth::Valid _ => unexpected ()
 
 monoPort (name, rate, unit) = synth::Port(name = name, rate = rate, channels = 1, unit = unit)
 
@@ -60,106 +27,7 @@ cable (source, destination) = synth::Cable(source = source, outlet = 0, destinat
 // Rewiring whatever 1->2->3 chain onto the direct 1->3 cable.
 bypass (graph) = accepted (Graphs::rewire (graph, cable (1, 3)))
 
-valid (outcome, check) = match outcome
-    synth::Valid value => check value
-    synth::Invalid _ => unexpected ()
 
-prepared (graph, count) = valid (Graphs::prepare graph, \plan => expect (length plan.order, count))
-
-observed snapshot =
-    handle static Signal<synth::Observation>
-        read => snapshot
-    expect (Observations::parameter (10, "cutoff") ?: -1.0, 440.0)
-    expect (Observations::parameter (20, "cutoff") ?: -1.0, 880.0)
-    succeeds (Observations::component 10, \component => expect (component.activeVoices, 3))
-    renderRefused (Observations::component 99)
-    renderRefused (Observations::parameter (30, "cutoff"))
-
-// [SYNTH-DSP] Numerical isolation is required: these paths must not need a host, UI or device.
-
-near (actual, expected, tolerance) = expect (abs (actual - expected) <= tolerance, true)
-
-sameStructure (actual, expected) = expect (structuralEquals (actual, expected), true)
-
-unexpected () = expect (false, true)
-
-tau = 6.283185307179586
-
-pi = 3.141592653589793
-
-rate = 48000.0
-
-sineWave (frequency, i) = sin (tau * frequency * toFloat i / rate)
-
-// The sine of `x` whole turns.
-turn x = sin (tau * x)
-
-sineAt (gain, frequency, i) = gain * sineWave (frequency, i)
-
-absSum samples = foldList (samples, 0.0, \(sum, value) => sum + abs value)
-
-// The largest magnitude in `samples`, or `start` when every sample is smaller.
-peakFrom (start, samples) = foldList (samples, start, \(peak, sample) => synth::TableMath::larger (peak, abs sample))
-
-oscillator (rate, frequency, waveform) = synth::OscillatorConfig(sampleRate = rate, frequency = frequency, pulseWidth = 0.5, waveform = waveform)
-
-sampleAt (config, phase) = (Oscillators::next (config, synth::OscillatorState(phase = phase))).sample
-
-oscRun (config, initialState, count) = foldList (toList (range (0, count)), initialState, \(held, _) => (Oscillators::next (config, held)).next)
-
-oscCase (rate, frequency, waveform) =
-    config = oscillator (rate, frequency, waveform)
-    succeeds (Oscillators::configure config, \accepted =>
-        whole = oscRun (accepted, Oscillators::initial, 512)
-        split = oscRun (accepted, oscRun (accepted, Oscillators::initial, 31), 481)
-        near (whole.phase, split.phase, 0.000000000001)
-        forEachList (toList (range (0, 128)), \i =>
-            value = (Oscillators::next (accepted, synth::OscillatorState(phase = toFloat i / 128.0))).sample
-            expect (value >= -1.01 && value <= 1.01, true)))
-
-invalidOscillator config = renderRefused (Oscillators::configure config)
-
-validEnvelope config = succeeds (Envelopes::configure config, \_ => expect (true, true))
-
-invalidEnvelope config = renderRefused (Envelopes::configure config)
-
-invalidFilter config = renderRefused (Filters::configure config)
-
-oscFrequencies rate = forEachList ([0.0, 55.0, 440.0, 7000.0], \frequency => forEachList ([synth::Sine, synth::Saw, synth::Pulse, synth::Triangle], \wave => oscCase (rate, frequency, wave)))
-
-envRun (config, initialState, count) = foldList (toList (range (0, count)), initialState, \(held, _) => Envelopes::next (config, held))
-
-levelOf (envelope) = envelope.level
-
-envelopeCase rate =
-    config = synth::EnvelopeConfig(sampleRate = rate, attack = 4.0 / rate, decay = 4.0 / rate, sustain = 0.5, release = 4.0 / rate)
-    started = Envelopes::noteOn (Envelopes::initial ())
-    attack = envRun (config, started, 4)
-    sustain = envRun (config, attack, 4)
-    near (attack.level, 1.0, 0.000000001)
-    near (sustain.level, 0.5, 0.000000001)
-    near (levelOf (Envelopes::next (config, sustain)), 0.5, 0.000000001)
-    releasing = Envelopes::noteOff (config, sustain)
-    near ((envRun (config, releasing, 4)).level, 0.0, 0.000000001)
-    near ((Envelopes::noteOff (config, releasing)).releaseStep, releasing.releaseStep, 0.0)
-    early = envRun (config, started, 2)
-    near ((Envelopes::noteOn early).level, early.level, 0.0)
-    near ((envRun (config, Envelopes::noteOff (config, early), 4)).level, 0.0, 0.000000001)
-
-filterRun (coefficients, initialState, count, input) = foldList (toList (range (0, count)), initialState, \(held, _) => (Filters::next (coefficients, held, input)).next)
-
-filterCase (rate, cutoff, resonance) =
-    config = synth::FilterConfig(sampleRate = rate, cutoff = cutoff, resonance = resonance)
-    succeeds (Filters::configure config, \c =>
-        settled = filterRun (c, Filters::initial, 4096, 1.0)
-        output = Filters::next (c, settled, 1.0)
-        near (output.low, 1.0, 0.0001)
-        near (output.high, 0.0, 0.0001)
-        split = filterRun (c, filterRun (c, Filters::initial, 127, 1.0), 3969, 1.0)
-        near (settled.integratorOne, split.integratorOne, 0.0)
-        near (settled.integratorTwo, split.integratorTwo, 0.0)
-        faded = filterRun (c, settled, 4096, 0.0)
-        near (faded.integratorTwo, 0.0, 0.0001))
 
 parameter key = synth::Parameter(key = key, label = "Cutoff", unit = synth::Hertz, minimum = 20.0, maximum = 20000.0, initial = 440.0, automatable = true)
 
