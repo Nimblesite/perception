@@ -11,3 +11,8 @@ keywords = []
 
 [modules]
 allow_wildcard_imports = false
+
+# A package's exports are its public API: each is documented and shows an example [DOC-EXPORT-REQUIRED] [DOC-EXPORT-EXAMPLE-REQUIRED]
+[lints]
+undocumented-export = "deny"
+unexampled-export = "deny"
