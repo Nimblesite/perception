@@ -42,4 +42,3 @@ module Playback
         Outcomes::carried (heard (song, playing, seeded (song, frames), from, until), \tracked =>
             Outcomes::carried (BusMix::stepped (song, tracked.buses, playing.states), \master =>
                 ok (Played(playing = Playing(score = song, cursor = until, tracks = tracked.plays, states = master.states), left = master.buses.left, right = master.buses.right))))
-

@@ -230,7 +230,6 @@ module EditorApp
                 true => tapped (context, editor(armedNote = -1), EditorView::toolbarAction index)
                 false => Runtime::step editor
 
-
     viewed (editor, width, height) =
         boardWidth = ui::Pick::either (editor.detailsShown, 1212.0, 1536.0)
         skin = ui::Canvases::viewed (StudioArt::sized (editor.skin, boardWidth, 828.0), width, height)

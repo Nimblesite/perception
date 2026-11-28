@@ -26,32 +26,32 @@ continued (plan, rate, edits, prior, count) = synth::Outcomes::carried (prior, \
 // [SYNTH-HOST-GRAPH] The hosted clip executor steps every kernel at the rate it was started with: its block is
 // the scalar renderer's at that rate, and unequal partitions carry the rate in the graph clock.
 clipped (run, rate) = detailOr (Renderer::block (run.plan, rate, run.snapshot, run.start, 64), "a scalar 64-frame block", \scalar =>
-        whole = outputClip (5, synth::GraphClips::advance (run.graph, rate, [], 64))
-        sameSamples (whole.clipSamples, scalar.samples)
-        forEachList ([[1, 6, 1, 56], [63, 1], [64]], \sizes => graphRunAt (run.graph, rate, 5, sizes, \clock audio =>
-            sameSamples (audio, scalar.samples)
-            expect (clock.graphRate, rate)
-            expect (clock.graphPosition, 64))))
+    whole = outputClip (5, synth::GraphClips::advance (run.graph, rate, [], 64))
+    sameSamples (whole.clipSamples, scalar.samples)
+    forEachList ([[1, 6, 1, 56], [63, 1], [64]], \sizes => graphRunAt (run.graph, rate, 5, sizes, \clock audio =>
+        sameSamples (audio, scalar.samples)
+        expect (clock.graphRate, rate)
+        expect (clock.graphPosition, 64))))
 
 // One rate's continuous block against every partition layout; the continuous samples are returned.
 partitionedAt (run, rate) = outcomeOr (Renderer::automated (run.plan, rate, run.snapshot, run.start, 64, run.edits), "a continuous 64-frame block", [], \whole =>
-        observedAt (whole, 5, 64)
-        expect (whole.audio.position, 64)
-        expect (absSum whole.audio.samples > 0.01, true)
-        // The 17-frame delay keeps the first 17 frames silent.
-        sameSamples (synth::Sequences::take (whole.audio.samples, 17), mapList (toList (range (0, 17)), \_ => 0.0))
-        forEachList (run.layouts, \sizes =>
-            expect (foldList (sizes, 0, \(sum, size) => satAdd sum size), 64)
-            succeeds (foldList (sizes, Success(value = { played = synth::Timeline(audio = run.start, observation = run.snapshot), heard = [] }), \(prior, count) => continued (run.plan, rate, run.edits, prior, count)), \pieces =>
-                sameSamples (pieces.heard, whole.audio.samples)
-                sameStructure (pieces.played.audio.states, whole.audio.states)
-                // Meters describe the last block alone; the revision, position and parameter values are the run's.
-                sameStructure ({ r = pieces.played.observation.revision, p = pieces.played.observation.samplePosition, v = pieces.played.observation.parameters }, { r = 5, p = 64, v = whole.observation.parameters })))
-        // An edit on a block's first frame belongs to that block; the block that ends just before it refuses it.
-        clipped (run, rate)
-        forEachList (filterList (run.edits, \e => e.samplePosition > 1), \edit =>
-            renderRefused (Renderer::automated (run.plan, rate, run.snapshot, run.start, edit.samplePosition, listConcat (owned (run.edits, 0, edit.samplePosition)) [edit])))
-        whole.audio.samples)
+    observedAt (whole, 5, 64)
+    expect (whole.audio.position, 64)
+    expect (absSum whole.audio.samples > 0.01, true)
+    // The 17-frame delay keeps the first 17 frames silent.
+    sameSamples (synth::Sequences::take (whole.audio.samples, 17), mapList (toList (range (0, 17)), \_ => 0.0))
+    forEachList (run.layouts, \sizes =>
+        expect (foldList (sizes, 0, \(sum, size) => satAdd sum size), 64)
+        succeeds (foldList (sizes, Success(value = { played = synth::Timeline(audio = run.start, observation = run.snapshot), heard = [] }), \(prior, count) => continued (run.plan, rate, run.edits, prior, count)), \pieces =>
+            sameSamples (pieces.heard, whole.audio.samples)
+            sameStructure (pieces.played.audio.states, whole.audio.states)
+            // Meters describe the last block alone; the revision, position and parameter values are the run's.
+            sameStructure ({ r = pieces.played.observation.revision, p = pieces.played.observation.samplePosition, v = pieces.played.observation.parameters }, { r = 5, p = 64, v = whole.observation.parameters })))
+    // An edit on a block's first frame belongs to that block; the block that ends just before it refuses it.
+    clipped (run, rate)
+    forEachList (filterList (run.edits, \e => e.samplePosition > 1), \edit =>
+        renderRefused (Renderer::automated (run.plan, rate, run.snapshot, run.start, edit.samplePosition, listConcat (owned (run.edits, 0, edit.samplePosition)) [edit])))
+    whole.audio.samples)
 
 // [SYNTH-ADVANCED-VERIFY-CORRECTNESS] [SYNTH-RENDER-BLOCKS] Unequal and one-sample partitions play the samples,
 // state and observation of one continuous block at 44.1, 48, 96 and 192 kHz, every edit on a block's first frame.

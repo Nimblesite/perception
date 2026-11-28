@@ -313,7 +313,7 @@ grainEventOrderJourney () =
             sameStructure (mapList (watched.voices, \voice => { identity = voice.identity, cursor = voice.cursor }), [{ identity = 0, cursor = 2.0 }, { identity = 1, cursor = 3.0 }]))
         // The half-open block window: events before the block or at its end belong elsewhere.
         forEachList ([[synth::GrainEvent(position = -1, controls = controls)], [synth::GrainEvent(position = 4, controls = controls)], [synth::GrainEvent(position = 2, controls = controls), synth::GrainEvent(position = 1, controls = controls)]],
-            \events => refusedWith (Grains::scheduled (pool, 4, events), "Grain events must be ordered and belong to this block's half-open sample interval."))
+        \events => refusedWith (Grains::scheduled (pool, 4, events), "Grain events must be ordered and belong to this block's half-open sample interval."))
         refusedWith (Grains::scheduled (pool, 4, mapList (grainQuiet 2049, \_ => synth::GrainEvent(position = 0, controls = controls))), "Invalid grain block size, clock or event capacity.")
         succeeds (Grains::scheduled (pool, 4, mapList (grainQuiet 2048, \_ => synth::GrainEvent(position = 0, controls = controls))), \many =>
             expect (length many.left, 4)))
@@ -428,7 +428,7 @@ registerGrainJourneys () =
             clockExhausted pool
             forEachList ([0, 2049], \size => refusedWith (Grains::block (pool, size), "Invalid grain block size, clock or event capacity."))
             forEachList ([[synth::GrainEvent(position = 2, controls = controls), synth::GrainEvent(position = 1, controls = controls)], [synth::GrainEvent(position = 4, controls = controls)]],
-                \events => refusedWith (Grains::scheduled (pool, 4, events), "Grain events must be ordered and belong to this block's half-open sample interval.")))))
+            \events => refusedWith (Grains::scheduled (pool, 4, events), "Grain events must be ordered and belong to this block's half-open sample interval.")))))
     test ("prepared grain samples keep their rate, channels and tuning through import and graph descriptors", \() => arithmetic (\() =>
         grainImportJourney ()
         grainDescriptorJourney ()

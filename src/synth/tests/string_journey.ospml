@@ -1,7 +1,6 @@
 import synth::StringVoices
 import synth::Activities
 
-
 // [SYNTH-ADVANCED-PHYSICAL-INSTRUMENTS] The string pool's public journey: preparation, plucking,
 // release tails, explicit stealing, typed refusals and preservation of untouched voices.
 

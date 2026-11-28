@@ -284,4 +284,3 @@ type PhysicalSchedule =
     FixedShaper
         config : ShaperConfig
         weights : List<float>
-

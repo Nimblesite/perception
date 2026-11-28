@@ -54,9 +54,9 @@ partitionedKernel (component, channels) =
                 expect (length last.heldKernel, channels))))
     trial = { target = component, frames = 1, states = initial }
     cases = [
-        trial(states = []), trial(states = [synth::RenderInputs::initialState (Components::sine (99, 440.0))]),
-        trial(frames = 0), trial(states = listConcat initial initial),
-        trial(target = component(outputs = [])), trial(target = component(processor = synth::Sink)) ]
+    trial(states = []), trial(states = [synth::RenderInputs::initialState (Components::sine (99, 440.0))]),
+    trial(frames = 0), trial(states = listConcat initial initial),
+    trial(target = component(outputs = [])), trial(target = component(processor = synth::Sink)) ]
     forEachList (cases, \row => renderRefused (synth::ClipKernels::block (plan, 48000.0, [source], row.target, row.frames, row.states)))
 
 // [SYNTH-RENDER-BLOCKS] The complete graph advances one clock across block partitions.
@@ -249,20 +249,20 @@ latencyPartitions (graph, held, history, sizes) = match sizes
     [] => expect (held.graphPosition, 26)
     [size, ...rest] => hostBlock (synth::GraphClips::next (graph, held, size), "latency block", \action =>
         waitingBlock (action, \(request, pending) =>
-                match held.graphPosition
-                    0 => dialsAre (request, 0.25)
-                    2 => dialsAre (request, 0.125)
-                    _ => expect (length request.parameters, 0)
-                joined = listConcat history request.samples
-                expected = synth::Sequences::take (joined, size)
-                wet = audioClipFixture (2, 1, expected)
-                hostBlock (synth::GraphClips::replied (pending, wet), "latency reply", \reply =>
-                    readyBlock (reply, \(next, clips) =>
-                            forEachList ([5, 4], \node => sameSamples ((clipFrom (clips, node)).clipSamples, expected))
-                            edited = match held.graphPosition == 0
-                                true => graph(nodes = mapList (graph.nodes, moveHostDial))
-                                false => graph
-                            latencyPartitions (edited, next, synth::Sequences::drop (joined, size), rest)))))
+            match held.graphPosition
+                0 => dialsAre (request, 0.25)
+                2 => dialsAre (request, 0.125)
+                _ => expect (length request.parameters, 0)
+            joined = listConcat history request.samples
+            expected = synth::Sequences::take (joined, size)
+            wet = audioClipFixture (2, 1, expected)
+            hostBlock (synth::GraphClips::replied (pending, wet), "latency reply", \reply =>
+                readyBlock (reply, \(next, clips) =>
+                    forEachList ([5, 4], \node => sameSamples ((clipFrom (clips, node)).clipSamples, expected))
+                    edited = match held.graphPosition == 0
+                        true => graph(nodes = mapList (graph.nodes, moveHostDial))
+                        false => graph
+                    latencyPartitions (edited, next, synth::Sequences::drop (joined, size), rest)))))
 
 moveHostDial n = match n.identity == 2
     true => n(parameters = mapList (n.parameters, \p => p(initial = 0.125)))

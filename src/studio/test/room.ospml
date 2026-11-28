@@ -735,12 +735,12 @@ detachedRoomJourney () =
         // Each resize: the window it measures, its width and height, then the room it leaves.
         scenes = [synth::PatchSurface, synth::Surface, synth::PatchSurface, synth::Surface, synth::Surface, synth::PatchSurface]
         rooms = [
-            [1536.0, 1008.0, 0.0, 180.0, 0.0],
-            [2600.0, 940.0, 0.0, 180.0, 580.0],
-            [1836.0, 1258.0, 300.0, 430.0, 580.0],
-            [1440.0, 940.0, 300.0, 430.0, 0.0],
-            [3000.0, 2000.0, 300.0, 430.0, 0.0],
-            [1536.0, 828.0, 0.0, 0.0, 0.0]
+        [1536.0, 1008.0, 0.0, 180.0, 0.0],
+        [2600.0, 940.0, 0.0, 180.0, 580.0],
+        [1836.0, 1258.0, 300.0, 430.0, 580.0],
+        [1440.0, 940.0, 300.0, 430.0, 0.0],
+        [3000.0, 2000.0, 300.0, 430.0, 0.0],
+        [1536.0, 828.0, 0.0, 0.0, 0.0]
         ]
         expect (length scenes, length rooms)
         panelShowsChosen (foldList (toList (range (0, length rooms)), opened, \(d, i) => resized (d, listGet scenes i ?: synth::Surface, listGet rooms i ?: []))))

@@ -29,10 +29,10 @@ tooLong () = foldList (toList (range (0, 257)), "", \(text, _) => text + "1")
 registerFormulaJourney () =
     test ("note formulas parse with precedence, evaluate totally and fold every pitch into MIDI range [SYNTH-FORMULA-NOTES]", \() => arithmetic (\() =>
         forEachList ([{ formula = "60", want = middleCFive }, { formula = "  60\t+ t ", want = [60, 61, 62, 63, 64] }, { formula = "60 + t * 2", want = [60, 62, 64, 66, 68] }, { formula = "(60 + t) * 2", want = [120, 122, 124, 126, 116] },
-            { formula = "60 + t % 3 * 4", want = [60, 64, 68, 60, 64] }, { formula = "(t - 5) % 12 + 60", want = [67, 68, 69, 70, 71] }, { formula = "2 ^ 3 ^ 2", want = [116, 116, 116, 116, 116] }, { formula = "-2 ^ 2 + 64", want = middleCFive },
-            { formula = "--60 + t", want = [60, 61, 62, 63, 64] }, { formula = "60 + 12 * sin(t * 3.14159265358979 / 2)", want = [60, 72, 60, 48, 60] }, { formula = "cos(t * 0) * 60", want = middleCFive }, { formula = "48 + floor(t / 2) * 7", want = [48, 48, 55, 55, 62] },
-            { formula = "abs(t - 2) * 12 + round(2.4) + 46", want = [72, 60, 48, 60, 72] }, { formula = "60 / (t - 2)", want = [6, 0, -1, 60, 30] }, { formula = "sqrt(t - 2) + 60", want = [-1, -1, 60, 61, 61] }, { formula = "t % 0", want = [-1, -1, -1, -1, -1] },
-            { formula = "-1 - t", want = [11, 10, 9, 8, 7] }, { formula = "1000000", want = [124, 124, 124, 124, 124] }, { formula = "1000001 + t", want = [-1, -1, -1, -1, -1] }, { formula = "((((t))))", want = [0, 1, 2, 3, 4] }], \c => formulaPitches (c.formula, c.want))))
+        { formula = "60 + t % 3 * 4", want = [60, 64, 68, 60, 64] }, { formula = "(t - 5) % 12 + 60", want = [67, 68, 69, 70, 71] }, { formula = "2 ^ 3 ^ 2", want = [116, 116, 116, 116, 116] }, { formula = "-2 ^ 2 + 64", want = middleCFive },
+        { formula = "--60 + t", want = [60, 61, 62, 63, 64] }, { formula = "60 + 12 * sin(t * 3.14159265358979 / 2)", want = [60, 72, 60, 48, 60] }, { formula = "cos(t * 0) * 60", want = middleCFive }, { formula = "48 + floor(t / 2) * 7", want = [48, 48, 55, 55, 62] },
+        { formula = "abs(t - 2) * 12 + round(2.4) + 46", want = [72, 60, 48, 60, 72] }, { formula = "60 / (t - 2)", want = [6, 0, -1, 60, 30] }, { formula = "sqrt(t - 2) + 60", want = [-1, -1, 60, 61, 61] }, { formula = "t % 0", want = [-1, -1, -1, -1, -1] },
+        { formula = "-1 - t", want = [11, 10, 9, 8, 7] }, { formula = "1000000", want = [124, 124, 124, 124, 124] }, { formula = "1000001 + t", want = [-1, -1, -1, -1, -1] }, { formula = "((((t))))", want = [0, 1, 2, 3, 4] }], \c => formulaPitches (c.formula, c.want))))
     test ("a formula the parser cannot read is refused with the column it stopped at", \() => arithmetic (\() =>
         formulaFault ("", "write 1 to 256 characters.")
         formulaFault (tooLong (), "write 1 to 256 characters.")

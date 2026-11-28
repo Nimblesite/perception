@@ -85,4 +85,3 @@ module Observations
     ```
     *)
     export subscribed (nodes, keys) = selected (snapshot (), nodes, keys)
-

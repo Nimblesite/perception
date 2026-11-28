@@ -62,4 +62,3 @@ type OperatorSchedule =
     FixedOperator
         config : OperatorConfig
         oversample : float
-

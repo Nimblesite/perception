@@ -91,4 +91,3 @@ type SpectrumSchedule =
     LiveSpectrum
     FixedSpectrum
         config : SpectralConfig
-

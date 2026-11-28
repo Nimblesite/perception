@@ -236,8 +236,6 @@ module StudioArt
     // Musical names match the skin's key labels, including accidentals.
     noteName note = listGet noteNames (satSub note 48) ?: "—"
 
-
-
     waveName value = match value
         1.0 => "Triangle"
         2.0 => "Saw"

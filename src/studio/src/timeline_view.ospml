@@ -425,10 +425,10 @@ module TimelineView
         listConcat (fact (name, value, top)) [box (1154.0, top + 24.0, 262.0, 3.0, Scenes::rgb (61, 52, 84), 9), box (1154.0, top + 24.0, width, 3.0, accent (), 10), Scenes::disc (1154.0 + width, top + 25.5, 4.0, accent (), 10)]
 
     details (editor, voice) = ui::Lists::flatten [
-        [label (voice.name, 1154.0, 196.0, 26.0, ink (), 0, 9), label ("Track ${satAdd editor.track 1}    ·    ${instrumentName voice.instrument} instrument", 1154.0, 236.0, 13.0, dim (), 0, 9)],
-        section ("MIX", 270.0), fader ("Gain", "${hundredths voice.gain}×", voice.gain, 4.0, 322.0),
-        fader ("Pan", pan voice.pan, voice.pan + 1.0, 2.0, 381.0), section ("BUS ROUTING", 440.0),
-        [label ("Output", 1154.0, 491.0, 14.0, dim (), 0, 9), box (1154.0, 518.0, 262.0, 36.0, Scenes::rgb (46, 39, 66), 9), Scenes::disc (1173.0, 536.0, 4.0, accent (), 10), label (destination voice, 1188.0, 529.0, 14.0, ink (), 0, 10), label ("›", 1400.0, 526.0, 18.0, dim (), 2, 10)]]
+    [label (voice.name, 1154.0, 196.0, 26.0, ink (), 0, 9), label ("Track ${satAdd editor.track 1}    ·    ${instrumentName voice.instrument} instrument", 1154.0, 236.0, 13.0, dim (), 0, 9)],
+    section ("MIX", 270.0), fader ("Gain", "${hundredths voice.gain}×", voice.gain, 4.0, 322.0),
+    fader ("Pan", pan voice.pan, voice.pan + 1.0, 2.0, 381.0), section ("BUS ROUTING", 440.0),
+    [label ("Output", 1154.0, 491.0, 14.0, dim (), 0, 9), box (1154.0, 518.0, 262.0, 36.0, Scenes::rgb (46, 39, 66), 9), Scenes::disc (1173.0, 536.0, 4.0, accent (), 10), label (destination voice, 1188.0, 529.0, 14.0, ink (), 0, 10), label ("›", 1400.0, 526.0, 18.0, dim (), 2, 10)]]
 
     (** The track inspector writes its controls through the same checked mixer action as the routing table. *)
     export inspectorAt (editor, x, y) = synth::Outcomes::carried (daw::Projects::required (editor.song.tracks, editor.track, "Select a track first."), \voice =>

@@ -1,7 +1,6 @@
 // [SYNTH-ADVANCED-CORE-MODELS] The render lifecycle: prepare, activate, render, reset, release with its tail, dispose.
 namespace synth
 
-
 (** A prepared instance is Ready; Activate makes it Running; ReleaseTail renders at most its declared tail and
     returns to Ready; Reset returns any live stage to Ready with silent state at position 0; Dispose ends it.
     Preparation fixes the sample rate and the largest block. Changing either re-prepares from Ready with

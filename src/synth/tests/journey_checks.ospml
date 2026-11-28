@@ -3,7 +3,6 @@
 import synth::Graphs
 import synth::Observations
 
-
 // `outcome`'s value handed to `consume`, or `fallback` once its refusal's detail is checked against `why`.
 outcomeOr (outcome, why, fallback, consume) = match outcome
     Error fault =>

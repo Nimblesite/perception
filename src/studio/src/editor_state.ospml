@@ -55,7 +55,6 @@ module EditorState
     (** Every component the picker can add, grouped by category in `categories` order. *)
     export pickerKinds () = foldList (categories, [], \(all, group) => listConcat all (filterList (listConcat kinds advancedKinds, \kind => category kind == group)))
 
-
     (** Human-readable names for the available component factories. *)
     export title kind = match kind
         "sample" => "Sample"

@@ -63,7 +63,6 @@ pitchMarkJourney () =
         refusedWith (PitchMarks::block (clock, [-0.5, 1.5]), "Pitch reference samples must be finite and normalised.")
         refusedWith (PitchMarks::block (clock, []), "Invalid pitch reference block or exhausted sample clock."))
 
-
 // Register the window, timing, math and clock journeys from the suite entry point.
 registerGrainMathJourneys () =
     test ("grain windows and timing selectors decode exactly and refuse unsupported modes", \() => arithmetic (\() =>
@@ -88,7 +87,7 @@ registerGrainMathJourneys () =
         succeeds (GrainWindows::decode (1.0, 0.25, 0.25), \shape => sameStructure (shape, synth::AsrWindow(attack = 0.25, release = 0.25)))
         succeeds (GrainWindows::decode (0.0, 0.9, 0.9), \shape => sameStructure (shape, synth::HannWindow))
         forEachList ([{ attack = 0.75, release = 0.5 }, { attack = 0.0, release = 0.25 }, { attack = 0.25, release = floatFromBits 9218868437227405312 }],
-            \c => refusedWith (GrainWindows::decode (1.0, c.attack, c.release), "Grain attack and release must be positive fractions whose sum is at most one."))
+        \c => refusedWith (GrainWindows::decode (1.0, c.attack, c.release), "Grain attack and release must be positive fractions whose sum is at most one."))
         forEachList ([2.0, 0.5, -1.0], \mode => refusedWith (GrainWindows::decode (mode, 0.25, 0.25), "Grain window must be 0 (Hann) or 1 (ASR)."))
         // [SYNTH-ADVANCED-GRAINS-TIMING] Exponential mean in [1, 1048576] and integer maximum in [1, 1048576].
         forEachList ([{ timing = synth::ExponentialTiming(mean = 1.0, maximum = 1), ok = true }, { timing = synth::ExponentialTiming(mean = 0.5, maximum = 1), ok = false }, { timing = synth::ExponentialTiming(mean = 0.999, maximum = 9), ok = false }, { timing = synth::ExponentialTiming(mean = 1048576.0, maximum = 1048576), ok = true }, { timing = synth::ExponentialTiming(mean = 1048577.0, maximum = 9), ok = false }, { timing = synth::ExponentialTiming(mean = 1.0, maximum = 0), ok = false }, { timing = synth::ExponentialTiming(mean = 1.0, maximum = 1048577), ok = false }, { timing = synth::PeriodicTiming(period = 1, jitter = 0), ok = true }, { timing = synth::PeriodicTiming(period = 0, jitter = 0), ok = false }, { timing = synth::PeriodicTiming(period = 1048577, jitter = 0), ok = false }, { timing = synth::PeriodicTiming(period = 1048576, jitter = 1048575), ok = true }, { timing = synth::PeriodicTiming(period = 4, jitter = 4), ok = false }], \c => expect (GrainTimings::valid c.timing, c.ok))
@@ -101,7 +100,7 @@ registerGrainMathJourneys () =
                 [jitter, maximum] => succeeds (GrainTimings::decode (1.0, 10, jitter, maximum), \timing => sameStructure (timing, synth::ExponentialTiming(mean = 10.0, maximum = maximum)))
                 _ => expect (length row, 2))
         forEachList ([{ mode = 1.0, mean = 0, jitter = 0, maximum = 100 }, { mode = 0.0, mean = 1048577, jitter = 0, maximum = 1 }, { mode = 1.0, mean = 1048577, jitter = 0, maximum = 100 }],
-            \c => refusedWith (GrainTimings::decode (c.mode, c.mean, c.jitter, c.maximum), "Invalid grain timing distribution or bounds."))
+        \c => refusedWith (GrainTimings::decode (c.mode, c.mean, c.jitter, c.maximum), "Invalid grain timing distribution or bounds."))
         forEachList ([2.0, 0.25], \mode => refusedWith (GrainTimings::decode (mode, 4, 1, 9), timingModes ()))))
     test ("generated grain math clips, caps and wraps at every boundary", \() => arithmetic (\() =>
         // Rows list a function's arguments, then its exact expected value.
@@ -162,12 +161,12 @@ registerGrainMathJourneys () =
             expect (grainStrictlyRising every.positions, true))
         // Switching policy preserves the pending onset and seed; only later gaps use the new policy.
         succeeds (schedulerRan (jitteredPeriodic, 11, 20), \first =>
-                sameStructure (first.positions, [0, 2, 10, 16])
-                onsetIs (first.next, 23, 1734574184)
-                resumed = synth::GrainClock(position = first.next.position, nextOnset = first.next.nextOnset, timing = synth::ExponentialTiming(mean = 2.0, maximum = 6), seed = first.next.seed)
-                succeeds (GrainScheduler::block (resumed, 20), \switched =>
-                    sameStructure (switched.positions, [23, 26, 27, 30, 31, 36, 37])
-                    onsetIs (switched.next, 43, 2115326081)))
+            sameStructure (first.positions, [0, 2, 10, 16])
+            onsetIs (first.next, 23, 1734574184)
+            resumed = synth::GrainClock(position = first.next.position, nextOnset = first.next.nextOnset, timing = synth::ExponentialTiming(mean = 2.0, maximum = 6), seed = first.next.seed)
+            succeeds (GrainScheduler::block (resumed, 20), \switched =>
+                sameStructure (switched.positions, [23, 26, 27, 30, 31, 36, 37])
+                onsetIs (switched.next, 43, 2115326081)))
         succeeds (GrainScheduler::prepare (9223372036854775743, synth::PeriodicTiming(period = 1048576, jitter = 0), 1), \late => refusedWith (GrainScheduler::block (late, 64), "The grain scheduler exhausted its onset clock."))
         refusedWith (GrainScheduler::block (forgedClock (0, 0, periodicFour), 2049), invalidGrainSchedulerState)
         // Forged clocks, invalid policies and zero-length blocks are refused without partial state.

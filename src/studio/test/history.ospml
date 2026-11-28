@@ -278,9 +278,9 @@ sampleRefusals driven =
     _tiny = writeFile "${outputFolder ()}/tiny.wav" "RIFF"
     _text = writeFile "${outputFolder ()}/text.wav" (join (mapList (toList (range (0, 16)), \_ => "not a wave file ")) "")
     cases = [
-        { path = "${outputFolder ()}/absent-sample.wav", check = \message => expect (message != "", true) },
-        { path = "${outputFolder ()}/tiny.wav", check = \message => expect (endsWith message "Choose a WAV file between 12 bytes and 8 MiB.", true) },
-        { path = "${outputFolder ()}/text.wav", check = \message => expect (contains message "WAV", true) }]
+    { path = "${outputFolder ()}/absent-sample.wav", check = \message => expect (message != "", true) },
+    { path = "${outputFolder ()}/tiny.wav", check = \message => expect (endsWith message "Choose a WAV file between 12 bytes and 8 MiB.", true) },
+    { path = "${outputFolder ()}/text.wav", check = \message => expect (contains message "WAV", true) }]
     foldList (cases, driven, \(held, row) => refusedFile (held, row.path, row.check))
 
 // A chooser failure is reported on the node. The built-in sample is an explicit edit.
@@ -451,8 +451,8 @@ arrangedOpened (samples, count, first) =
 arrangedKickHead samples =
     arrangedOpened (samples, 5, -0.5)
     arrangedReadings (samples, closeTo, [
-        { frame = 1, want = -0.4994192478404178 }, { frame = 2, want = -0.49825365548570233 },
-        { frame = 3, want = -0.49650526238606774 }, { frame = 4, want = -0.49417678890818284 }])
+    { frame = 1, want = -0.4994192478404178 }, { frame = 2, want = -0.49825365548570233 },
+    { frame = 3, want = -0.49650526238606774 }, { frame = 4, want = -0.49417678890818284 }])
 
 arrangedKickWhole samples =
     expect (length samples, 12000)
@@ -466,9 +466,9 @@ arrangedKickPadded samples =
 arrangedPairSamples samples =
     arrangedOpened (samples, 12002, -0.5)
     arrangedReadings (samples, closeTo, [
-        { frame = 5999, want = 0.005101474122257177 }, { frame = 6000, want = -0.4954169144577917 },
-        { frame = 6001, want = -0.49535932751606987 }, { frame = 12000, want = 0.0045830855422083275 },
-        { frame = 12001, want = 0.004059920324347923 }])
+    { frame = 5999, want = 0.005101474122257177 }, { frame = 6000, want = -0.4954169144577917 },
+    { frame = 6001, want = -0.49535932751606987 }, { frame = 12000, want = 0.0045830855422083275 },
+    { frame = 12001, want = 0.004059920324347923 }])
 
 // Two identical notes on one beat: the carry sums them from the first frame.
 arrangedTwinSamples samples =
@@ -489,8 +489,8 @@ arrangedLateSamples samples =
 arrangedAddedBuses buses =
     arrangedBusFrames (buses, 3)
     arrangedReadings (buses.left, closeTo, [
-        { frame = 0, want = -0.7071067811865476 }, { frame = 1, want = -0.706285473606089 },
-        { frame = 2, want = -0.7046370770898519 }])
+    { frame = 0, want = -0.7071067811865476 }, { frame = 1, want = -0.706285473606089 },
+    { frame = 2, want = -0.7046370770898519 }])
     arrangedReadings (buses.right, closeTo, [{ frame = 0, want = -0.7071067811865475 }, { frame = 1, want = -0.7062854736060888 }])
 
 // [SYNTH-ARRANGEMENT] The same drum rendered into each window, including reversed overlap and a silent gap.
@@ -499,14 +499,14 @@ arrangedDrumParts (song, kick) =
     overlap = arrangedNote (0.25, 0.5)
     later = arrangedNote (1.0, 0.5)
     cases = [
-        { notes = kick.notes, frames = 5, inspect = arrangedKickHead },
-        { notes = kick.notes, frames = 12000, inspect = arrangedKickWhole },
-        { notes = kick.notes, frames = 12003, inspect = arrangedKickPadded },
-        { notes = [head, overlap], frames = 12002, inspect = arrangedPairSamples },
-        { notes = [overlap, head], frames = 12002, inspect = arrangedPairSamples },
-        { notes = [head, head], frames = 12000, inspect = arrangedTwinSamples },
-        { notes = [head, later], frames = 24001, inspect = arrangedGapSamples },
-        { notes = [later], frames = 24000, inspect = arrangedLateSamples }]
+    { notes = kick.notes, frames = 5, inspect = arrangedKickHead },
+    { notes = kick.notes, frames = 12000, inspect = arrangedKickWhole },
+    { notes = kick.notes, frames = 12003, inspect = arrangedKickPadded },
+    { notes = [head, overlap], frames = 12002, inspect = arrangedPairSamples },
+    { notes = [overlap, head], frames = 12002, inspect = arrangedPairSamples },
+    { notes = [head, head], frames = 12000, inspect = arrangedTwinSamples },
+    { notes = [head, later], frames = 24001, inspect = arrangedGapSamples },
+    { notes = [later], frames = 24000, inspect = arrangedLateSamples }]
     forEachList (cases, \row => succeeds (trackPart (song, kick(notes = row.notes), row.frames), row.inspect))
 
 arrangementsJourney () =
@@ -521,10 +521,10 @@ arrangementsJourney () =
     forEachList ([{ song = arrangedSong (120.0, 48000, []), want = 0.0 }, { song = arrangedSong (120.0, 48000, [arrangedBell ("rest", 1.0, [])]), want = 0.0 }, { song = arrangedSong (120.0, 48000, [arrangedBell ("one", 1.0, [arrangedNote (0.0, 1.0), arrangedNote (4.0, 2.5), arrangedNote (8.5, 0.25)])]), want = 8.75 }, { song = arrangedSong (120.0, 48000, [arrangedBell ("one", 1.0, [arrangedNote (0.0, 1.0), arrangedNote (4.0, 2.5)]), arrangedBell ("two", 1.0, [arrangedNote (12.0, 1.0)])]), want = 13.0 }, { song = arrangedSong (120.0, 48000, [arrangedBell ("one", 1.0, [arrangedNote (-1.0, 0.5)])]), want = 0.0 }], \row => expect (daw::Arrangements::beats row.song, row.want))
     // frame: floor (beat * 60 / tempo * rate + 0.5), halves rounding down, negatives away from zero.
     frameCases = [
-        { song = song120, beat = 0.0, want = 0 }, { song = song120, beat = 0.5, want = 12000 },
-        { song = song120, beat = 1.0, want = 24000 }, { song = song120, beat = 1.25, want = 30000 },
-        { song = song120, beat = -0.5, want = -12000 }, { song = song200, beat = 0.5, want = 7200 },
-        { song = song200, beat = 1.5, want = 21600 }, { song = song20, beat = 2.0, want = 288000 }]
+    { song = song120, beat = 0.0, want = 0 }, { song = song120, beat = 0.5, want = 12000 },
+    { song = song120, beat = 1.0, want = 24000 }, { song = song120, beat = 1.25, want = 30000 },
+    { song = song120, beat = -0.5, want = -12000 }, { song = song200, beat = 0.5, want = 7200 },
+    { song = song200, beat = 1.5, want = 21600 }, { song = song20, beat = 2.0, want = 288000 }]
     forEachList (frameCases, \row =>
         succeeds (daw::Arrangements::frame (row.song, row.beat), \at => expect (at, row.want)))
     forEachList ([sqrt (-1.0), pow (10.0, 400.0)], \beat =>
@@ -558,9 +558,9 @@ arrangementsJourney () =
     succeeds (daw::Arrangements::layered (silent, [7.0, 8.0], [7.0, 8.0], 3, 1.0, 0.0), \offset => expect (offset.left, [0.0, 0.0, 0.0, 7.0, 8.0]))
     refusesMix = "Gain must be 0 to 4, pan -1 to 1 and the offset not negative."
     mixCases = [
-        { offset = -1, gain = 1.0, pan = 0.0 }, { offset = 0, gain = -0.001, pan = 0.0 },
-        { offset = 0, gain = 4.001, pan = 0.0 }, { offset = 0, gain = 1.0, pan = -1.001 },
-        { offset = 0, gain = 1.0, pan = 1.001 }]
+    { offset = -1, gain = 1.0, pan = 0.0 }, { offset = 0, gain = -0.001, pan = 0.0 },
+    { offset = 0, gain = 4.001, pan = 0.0 }, { offset = 0, gain = 1.0, pan = -1.001 },
+    { offset = 0, gain = 1.0, pan = 1.001 }]
     forEachList (mixCases, \row =>
         failsWith (daw::Arrangements::layered (silent, [1.0], [1.0], row.offset, row.gain, row.pan), refusesMix))
     // part: one drum note's exact samples, overlap-add, the silence gap, the padding and every fault.
@@ -661,8 +661,8 @@ familiesJourney () =
     shifted (12.0, 92, 46, 110)
     // [DAW-TRANSPORT-REFUSAL] A note that cannot play names its track and the module at fault in plain words.
     forEachList ([
-        { parts = [part ("noSuchModule", 0, [])], why = "note: noSuchModule 0: Unknown module \"noSuchModule\"." },
-        { parts = [part ("sine", 0, [fixed ("cutoff", 1.0)])], why = "note: Oscillator 0: It has no setting \"cutoff\"." },
-        { parts = [part ("wavetable", 0, [fixed ("harmonics", 2.5)])], why = "note: wavetable 0: It needs a whole constant for harmonics." },
-        { parts = [part ("wavetable", 0, [fixed ("harmonics", 8.0), fixed ("harmonics", 8.0)])], why = "note: wavetable 0: It sets harmonics twice." }], \c =>
+    { parts = [part ("noSuchModule", 0, [])], why = "note: noSuchModule 0: Unknown module \"noSuchModule\"." },
+    { parts = [part ("sine", 0, [fixed ("cutoff", 1.0)])], why = "note: Oscillator 0: It has no setting \"cutoff\"." },
+    { parts = [part ("wavetable", 0, [fixed ("harmonics", 2.5)])], why = "note: wavetable 0: It needs a whole constant for harmonics." },
+    { parts = [part ("wavetable", 0, [fixed ("harmonics", 8.0), fixed ("harmonics", 8.0)])], why = "note: wavetable 0: It sets harmonics twice." }], \c =>
         failsWith (sampledNote (middleC (), chainOf c.parts), c.why))

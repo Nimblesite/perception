@@ -66,9 +66,9 @@ module Sha256 {
     fn schedule(padded, off) = {
         let words = range(0, 16) |> map(fn(i) => wordAt(padded, wrapAdd(off, wrapMul(i, 4)))) |> toList
         fold(range(16, 64), words, fn(acc, i) => {
-            let s1 = sigma1(listGet(acc, wrapSub(i, 2)) ?: 0)
-            let s0 = sigma0(listGet(acc, wrapSub(i, 15)) ?: 0)
-            listAppend(acc, modAdd(modAdd(modAdd(s1, listGet(acc, wrapSub(i, 7)) ?: 0), s0), listGet(acc, wrapSub(i, 16)) ?: 0))
+                let s1 = sigma1(listGet(acc, wrapSub(i, 2)) ?: 0)
+                let s0 = sigma0(listGet(acc, wrapSub(i, 15)) ?: 0)
+                listAppend(acc, modAdd(modAdd(modAdd(s1, listGet(acc, wrapSub(i, 7)) ?: 0), s0), listGet(acc, wrapSub(i, 16)) ?: 0))
         })
     }
 

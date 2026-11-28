@@ -1,7 +1,6 @@
 // [SYNTH-RENDER] Reference graph execution shares kernels with standalone components.
 namespace synth
 
-
 (** Component dispatch shared by offline graph execution. *)
 module RenderKernels
     sine (rate, snapshot, frame, held, waveform, shape) =

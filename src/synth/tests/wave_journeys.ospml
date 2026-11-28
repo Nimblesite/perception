@@ -354,13 +354,13 @@ registerWaveJourneys () =
             sameSamples (wave.samples, [0.5, -1.0])
             exactRows ([{ got = wave.sampleRate, want = 48000 }, { got = wave.channels, want = 1 }, { got = wave.frames, want = 2 }]))
         forEachList ([{ bytes = wavFile (1, 1, 44100, 8, [0, 128, 255]), want = [-1.0, 0.0, 0.9921875], channels = 1, frames = 3 }, { bytes = wavFile (1, 1, 8000, 24, [0, 0, 128, 0, 0, 64, 255, 255, 127]), want = [-1.0, 0.5, 0.9999998807907104], channels = 1, frames = 3 },
-            { bytes = wavFile (1, 1, 192000, 32, [0, 0, 0, 128, 255, 255, 255, 127]), want = [-1.0, 0.9999999995343387], channels = 1, frames = 2 }, { bytes = wavFile (3, 2, 48000, 32, [0, 0, 128, 63, 0, 0, 0, 191, 0, 0, 128, 191, 0, 0, 128, 63]), want = [0.25, 0.0], channels = 2, frames = 2 },
-            { bytes = wavFile (1, 2, 48000, 16, [0, 64, 0, 192, 255, 127, 0, 128]), want = [0.0, -0.0000152587890625], channels = 2, frames = 2 }],
-            \held => succeeds (WaveImport::decode held.bytes, \wave =>
-                succeeds (SampleResources::fromWave ("decoded", 60.0, wave), \resource => succeeds (SampleResources::mono resource, \mono => sameSamples (mono, held.want)))
-                exactRows ([{ got = wave.channels, want = held.channels }, { got = wave.frames, want = held.frames }])
-                expect (wave.sampleRate > 0, true)
-                expect (length wave.samples == satMul wave.frames wave.channels, true)))
+        { bytes = wavFile (1, 1, 192000, 32, [0, 0, 0, 128, 255, 255, 255, 127]), want = [-1.0, 0.9999999995343387], channels = 1, frames = 2 }, { bytes = wavFile (3, 2, 48000, 32, [0, 0, 128, 63, 0, 0, 0, 191, 0, 0, 128, 191, 0, 0, 128, 63]), want = [0.25, 0.0], channels = 2, frames = 2 },
+        { bytes = wavFile (1, 2, 48000, 16, [0, 64, 0, 192, 255, 127, 0, 128]), want = [0.0, -0.0000152587890625], channels = 2, frames = 2 }],
+        \held => succeeds (WaveImport::decode held.bytes, \wave =>
+            succeeds (SampleResources::fromWave ("decoded", 60.0, wave), \resource => succeeds (SampleResources::mono resource, \mono => sameSamples (mono, held.want)))
+            exactRows ([{ got = wave.channels, want = held.channels }, { got = wave.frames, want = held.frames }])
+            expect (wave.sampleRate > 0, true)
+            expect (length wave.samples == satMul wave.frames wave.channels, true)))
         // An 18-byte format extension, a metadata chunk and odd-body padding all survive.
         succeeds (WaveImport::decode (wavPack [wavChunk ("fmt ", listConcat (wavStdBody ()) (wavWord16 0)), wavChunk ("LIST", [9, 8, 7]), wavMonoData ()]), \wave => sameSamples (wave.samples, [0.5, -1.0]))))
     test ("WAV import refuses corrupt sizes, headers, chunks, formats and out-of-range samples", \() => arithmetic (\() =>
@@ -368,25 +368,25 @@ registerWaveJourneys () =
         data = wavMonoData ()
         standard = wavStdBody ()
         forEachList ([{ why = "WAV file size must be between 12 bytes and 8 MiB.", bad = [[], wavText "RIFF"] }, { why = "Expected a complete little-endian RIFF/WAVE file.", bad = [wavJoin [wavText "RIFX", wavWord32 4, wavText "WAVE"], wavJoin [wavText "RIFF", wavWord32 4, wavText "WAVX"], wavJoin [wavText "RIFF", wavWord32 99, wavText "WAVE"]] },
-            { why = "WAV input contains a value outside the byte range.", bad = [wavJoin [[999, 73, 70, 70], wavWord32 4, wavText "WAVE"], wavJoin [[-1, 73, 70, 70], wavWord32 4, wavText "WAVE"], listConcat (wavHeader 12) [999, 85, 78, 75, 4, 0, 0, 0]] },
-            { why = "Truncated WAV chunk header or too many chunks (limit 1024).", bad = [listConcat (wavHeader 10) [74, 85, 78, 75, 0, 0], wavPack (mapList (toList (range (0, 1025)), \_ => wavChunk ("LIST", [])))] }, { why = "Truncated WAV chunk body or padding.", bad = [wavPack [fmt, wavJoin [wavText "data", wavWord32 100]], wavPack [fmt, wavUnpadded ("LIST", [1, 2, 3])]] },
-            { why = "Duplicate or short WAV format chunk.", bad = [wavPack [fmt, fmt, data], wavPack [wavChunk ("fmt ", wavJoin [wavWord16 1, wavWord16 1, wavWord32 48000, wavWord32 96000, wavWord16 2, [16]]), data]] }, { why = "Duplicate WAV data chunk.", bad = [wavPack [fmt, data, data]] }, { why = "WAV requires one format chunk and one data chunk.", bad = [wavPack [fmt], wavPack [data]] },
-            { why = "Truncated WAV format extension.", bad = [wavPack [wavChunk ("fmt ", listAppend (standard, 0)), data]] },
-            { why = "Extended WAV formats are not supported by this importer.", bad = [wavPack [wavChunk ("fmt ", listConcat (standard, wavWord16 2)), data], wavPack [wavChunk ("fmt ", listConcat (standard, listAppend (wavWord16 0, 0))), data], wavPack [wavChunk ("fmt ", listConcat (standard, listAppend (wavWord16 2, 0))), data]] },
-            { why = "WAV requires 2–1048576 complete sample frames.", bad = [wavFile (1, 1, 48000, 16, [0, 64]), wavFile (1, 1, 48000, 16, [0, 64, 0, 128, 0])] },
-            { why = "WAV samples must be finite and within [-1, 1].", bad = [wavFile (3, 1, 48000, 32, [0, 0, 128, 63, 0, 0, 0, 64]), wavFile (3, 1, 48000, 32, [0, 0, 128, 63, 0, 0, 192, 127]), wavFile (3, 2, 48000, 32, [0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64])] }],
-            \held => forEachList (held.bad, \bad => refusedWith (WaveImport::decode bad, held.why)))
+        { why = "WAV input contains a value outside the byte range.", bad = [wavJoin [[999, 73, 70, 70], wavWord32 4, wavText "WAVE"], wavJoin [[-1, 73, 70, 70], wavWord32 4, wavText "WAVE"], listConcat (wavHeader 12) [999, 85, 78, 75, 4, 0, 0, 0]] },
+        { why = "Truncated WAV chunk header or too many chunks (limit 1024).", bad = [listConcat (wavHeader 10) [74, 85, 78, 75, 0, 0], wavPack (mapList (toList (range (0, 1025)), \_ => wavChunk ("LIST", [])))] }, { why = "Truncated WAV chunk body or padding.", bad = [wavPack [fmt, wavJoin [wavText "data", wavWord32 100]], wavPack [fmt, wavUnpadded ("LIST", [1, 2, 3])]] },
+        { why = "Duplicate or short WAV format chunk.", bad = [wavPack [fmt, fmt, data], wavPack [wavChunk ("fmt ", wavJoin [wavWord16 1, wavWord16 1, wavWord32 48000, wavWord32 96000, wavWord16 2, [16]]), data]] }, { why = "Duplicate WAV data chunk.", bad = [wavPack [fmt, data, data]] }, { why = "WAV requires one format chunk and one data chunk.", bad = [wavPack [fmt], wavPack [data]] },
+        { why = "Truncated WAV format extension.", bad = [wavPack [wavChunk ("fmt ", listAppend (standard, 0)), data]] },
+        { why = "Extended WAV formats are not supported by this importer.", bad = [wavPack [wavChunk ("fmt ", listConcat (standard, wavWord16 2)), data], wavPack [wavChunk ("fmt ", listConcat (standard, listAppend (wavWord16 0, 0))), data], wavPack [wavChunk ("fmt ", listConcat (standard, listAppend (wavWord16 2, 0))), data]] },
+        { why = "WAV requires 2–1048576 complete sample frames.", bad = [wavFile (1, 1, 48000, 16, [0, 64]), wavFile (1, 1, 48000, 16, [0, 64, 0, 128, 0])] },
+        { why = "WAV samples must be finite and within [-1, 1].", bad = [wavFile (3, 1, 48000, 32, [0, 0, 128, 63, 0, 0, 0, 64]), wavFile (3, 1, 48000, 32, [0, 0, 128, 63, 0, 0, 192, 127]), wavFile (3, 2, 48000, 32, [0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64])] }],
+        \held => forEachList (held.bad, \bad => refusedWith (WaveImport::decode bad, held.why)))
         // Unsupported encodings and widths, three channels, rates outside 8–192 kHz, misaligned frames, wrong byte rate.
         forEachList ([wavFormatBody (1, 1, 48000, 1, 48000, 12), wavFormatBody (2, 1, 48000, 2, 96000, 16), wavFormatBody (3, 1, 48000, 2, 96000, 16), wavFormatBody (1, 3, 48000, 6, 288000, 16), wavFormatBody (1, 1, 7999, 2, 15998, 16), wavFormatBody (1, 1, 192001, 2, 384002, 16), wavFormatBody (1, 1, 48000, 3, 96000, 16), wavFormatBody (1, 1, 48000, 2, 48000, 16)],
-            \body => refusedWith (WaveImport::decode (wavPack [wavChunk ("fmt ", body), wavMonoData ()]), "WAV requires PCM 8/16/24/32 or float32, mono/stereo, 8–192 kHz and consistent frame/byte rates."))))
+        \body => refusedWith (WaveImport::decode (wavPack [wavChunk ("fmt ", body), wavMonoData ()]), "WAV requires PCM 8/16/24/32 or float32, mono/stereo, 8–192 kHz and consistent frame/byte rates."))))
     test ("sample resources validate metadata, prepare grains and transpose by root pitch", \() => arithmetic (\() =>
         kit = resourceOf ("loop", 48000, 2, 261.6255653005986, [0.5, -0.5, 0.25, -0.25])
         longName = repeated (256, "x")
         forEachList ([{ r = kit, want = true }, { r = kit(name = "x"), want = true }, { r = kit(name = longName), want = true }, { r = kit(sampleRate = 8000), want = true }, { r = kit(sampleRate = 192000), want = true },
-            { r = kit(sourceChannels = 1), want = true }, { r = kit(rootFrequency = 1.0), want = true }, { r = kit(rootFrequency = 20000.0), want = true }, { r = kit(name = ""), want = false },
-            { r = kit(name = repeated (257, "x")), want = false }, { r = kit(sampleRate = 7999), want = false }, { r = kit(sampleRate = 192001), want = false },
-            { r = kit(sourceChannels = 0), want = false }, { r = kit(sourceChannels = 3), want = false }, { r = kit(rootFrequency = 0.99), want = false }, { r = kit(rootFrequency = 20000.1), want = false }],
-            \held => expect (SampleResources::metadata held.r, held.want))
+        { r = kit(sourceChannels = 1), want = true }, { r = kit(rootFrequency = 1.0), want = true }, { r = kit(rootFrequency = 20000.0), want = true }, { r = kit(name = ""), want = false },
+        { r = kit(name = repeated (257, "x")), want = false }, { r = kit(sampleRate = 7999), want = false }, { r = kit(sampleRate = 192001), want = false },
+        { r = kit(sourceChannels = 0), want = false }, { r = kit(sourceChannels = 3), want = false }, { r = kit(rootFrequency = 0.99), want = false }, { r = kit(rootFrequency = 20000.1), want = false }],
+        \held => expect (SampleResources::metadata held.r, held.want))
         succeeds (SampleResources::prepare kit, \prepared => expect (structuralEquals prepared kit, true))
         // kit(samples=...) variants fail inside grain preparation; the last fails metadata first.
         forEachList ([kit(samples = []), kit(samples = [0.5]), kit(samples = [0.5, 1.5])], \bad => refusedWith (SampleResources::prepare bad, "Grains require 2–1048576 finite normalised mono samples and capacity 1–256."))
@@ -403,7 +403,7 @@ registerWaveJourneys () =
         refusedAs (SampleResources::decodeWave ("loop", 60.0, wavText "RIFF"), "resource", "WAV file size must be between 12 bytes and 8 MiB.")
         succeeds (SampleResources::fromWave ("loop", 60.0, wave), \tuned =>
             forEachList ([{ note = 60.0, rate = 48000.0, want = 1.0 }, { note = 72.0, rate = 48000.0, want = 2.0 }, { note = 48.0, rate = 96000.0, want = 0.25 }, { note = 60.0, rate = 44100.0, want = 1.08843537414966 }],
-                \held => succeeds (SampleResources::playbackRate (tuned, held.note, held.rate), \speed => near (speed, held.want, 0.000000001)))
+            \held => succeeds (SampleResources::playbackRate (tuned, held.note, held.rate), \speed => near (speed, held.want, 0.000000001)))
             forEachList ([-1.0, 128.0], \note => refusedWith (SampleResources::playbackRate (tuned, note, 48000.0), invalidSamplePitchOr))
             forEachList ([7999.0, 384001.0], \rate => refusedWith (SampleResources::playbackRate (tuned, 60.0, rate), invalidSamplePitchOr))
             expect (SampleResources::metadata kit, true))
@@ -414,7 +414,7 @@ registerWaveJourneys () =
         near2 (WaveMath::pcm, [[0.0, 8.0, -1.0], [128.0, 8.0, 0.0], [255.0, 8.0, 0.9921875], [0.0, 16.0, 0.0], [16384.0, 16.0, 0.5], [32767.0, 16.0, 0.999969482421875], [32768.0, 16.0, -1.0], [65535.0, 16.0, -0.000030517578125], [0.0, 24.0, 0.0], [4194304.0, 24.0, 0.5], [8388608.0, 24.0, -1.0], [16777215.0, 24.0, -0.00000011920928955078125], [0.0, 32.0, 0.0], [2147483648.0, 32.0, -1.0], [4294967295.0, 32.0, -0.00000000046566128730773926]], 0.0)
         near2 (WaveMath::mono, [[0.25, -0.5, -0.125], [-1.0, 1.0, 0.0], [0.5, 0.5, 0.5], [0.75, 0.25, 0.5]], 0.0)
         nearRows ([{ got = WaveMath::playbackRate (48000.0, 48000.0, 440.0, 220.0), want = 2.0, within = 0.000000001 }, { got = WaveMath::playbackRate (48000.0, 96000.0, 880.0, 880.0), want = 0.5, within = 0.000000001 },
-            { got = WaveMath::playbackRate (44100.0, 48000.0, 440.0, 440.0), want = 0.91875, within = 0.000000001 }, { got = WaveMath::playbackRate (24000.0, 48000.0, 440.0, 220.0), want = 1.0, within = 0.000000001 }])
+        { got = WaveMath::playbackRate (44100.0, 48000.0, 440.0, 440.0), want = 0.91875, within = 0.000000001 }, { got = WaveMath::playbackRate (24000.0, 48000.0, 440.0, 220.0), want = 1.0, within = 0.000000001 }])
         near1 (Waves::midiFrequency, [[69.0, 440.0], [81.0, 880.0], [57.0, 220.0]], 0.0)
         near1 (Waves::midiFrequency, [[60.0, 261.6255653005986], [0.0, 8.175798915643707]], 0.000000001)
         exactRows ([{ got = Waves::velocitySample (0.5, 0.8), want = 0.4 }, { got = Waves::velocitySample (-1.0, 0.25), want = -0.25 }, { got = Waves::velocitySample (0.25, 0.0), want = 0.0 }])
@@ -448,10 +448,10 @@ registerWaveJourneys () =
         expect (kept.kept > moved.kept * 3.0 && moved.raised > kept.raised * 3.0, true)
         // Equal envelopes give a gain of exactly 1; silence is never amplified; gains stop at +24 dB.
         forEachList ([{ w = 0.3, c = 0.3, want = 1.0 }, { w = 5.0, c = 0.0, want = 1.0 }, { w = 100.0, c = 1.0, want = 16.0 }, { w = 1.0, c = 4.0, want = 0.25 }, { w = 2.0, c = 0.5, want = 4.0 }],
-            \g => expect (SpectralMath::formantGain (g.w, g.c), g.want))
+        \g => expect (SpectralMath::formantGain (g.w, g.c), g.want))
         expect (SpectralMath::envelopeRadius (1024.0, 16000.0), 10.0)
         forEachList ([{ r = 1.5, f = 0.25, ok = true }, { r = 1.5, f = 4.0, ok = true }, { r = 0.5, f = 2.0, ok = true }, { r = 1.5, f = 0.2, ok = false }, { r = 1.5, f = 4.5, ok = false }, { r = 0.2, f = 1.0, ok = false }, { r = 1.0, f = 0.0, ok = false }],
-            \c => expect (configured (formantConfig (c.r, c.f)), c.ok))
+        \c => expect (configured (formantConfig (c.r, c.f)), c.ok))
         spectral = Components::spectral (7, 1024, 256, 6.0)
         forEachList ([{ key = "semitones", low = -12.0, high = 12.0 }, { key = "cents", low = -100.0, high = 100.0 }, { key = "keepFormants", low = 0.0, high = 1.0 }], \b => expect (length (filterList (spectral.parameters, \p => p.key == b.key && p.initial == 0.0 && p.minimum == b.low && p.maximum == b.high)), 1))))
     test ("the FFT pitch shifter moves a sine at 16 and 48 kHz by 1, 5, 7 and 12 semitones and 1, 10 and 50 cents either way within 1 cent, 1 dB of level and 1 dB of ripple", \() => arithmetic (\() =>
@@ -470,7 +470,7 @@ registerWaveJourneys () =
         forEachList ([0, 1, 2, 3], \i => expect ((listGet tilts (satAdd i 1) ?: 0.0) > (listGet tilts i ?: 0.0) * 1.2, true))
         expect ((listGet tilts 0 ?: 9.0) < 0.2 && (listGet tilts 4 ?: 0.0) > 5.0, true)
         forEachList ([{ a = 0.0, want = 0.5 }, { a = 0.25, want = 0.2812 }, { a = 0.5, want = 0.1581 }, { a = 0.75, want = 0.0889 }, { a = 1.0, want = 0.05 }],
-            \c => near (morphLevel (morphConfig (c.a, synth::Blend), tones, 500.0) / c.want, 1.0, 0.05))
+        \c => near (morphLevel (morphConfig (c.a, synth::Blend), tones, 500.0) / c.want, 1.0, 0.05))
         // Envelope: the main voice's harmonics (resonance 1 kHz) take on the side voice's resonance at 1.875 kHz.
         own = listGet levels 0 ?: { low = 0.0, high = 0.0 }
         crossed = listGet levels 4 ?: own
@@ -482,7 +482,7 @@ registerWaveJourneys () =
     test ("partial morphing glides every matched harmonic to the geometric pitch between two tones [SYNTH-SPECTRAL-MORPH]", \() => arithmetic (\() =>
         // Rising and falling glides, fifths and an octave, at five amounts: 0 and 1 reproduce their source tone.
         forEachList ([{ low = 220.0, high = 330.0, a = 0.0 }, { low = 220.0, high = 330.0, a = 0.25 }, { low = 220.0, high = 330.0, a = 0.5 }, { low = 220.0, high = 330.0, a = 0.75 }, { low = 220.0, high = 330.0, a = 1.0 },
-            { low = 330.0, high = 220.0, a = 0.5 }, { low = 330.0, high = 220.0, a = 0.25 }, { low = 200.0, high = 400.0, a = 0.5 }, { low = 250.0, high = 375.0, a = 0.6 }, { low = 300.0, high = 200.0, a = 0.9 }], partialLanded)
+        { low = 330.0, high = 220.0, a = 0.5 }, { low = 330.0, high = 220.0, a = 0.25 }, { low = 200.0, high = 400.0, a = 0.5 }, { low = 250.0, high = 375.0, a = 0.6 }, { low = 300.0, high = 200.0, a = 0.9 }], partialLanded)
         // Unequal partial counts: orphans fade by 1 - amount at their own pitch while the pairs glide.
         forEachList ([{ a = 0.0 }, { a = 0.25 }, { a = 0.4 }, { a = 0.5 }], orphansLanded)
         // Partial morphing is stateful: it cannot share a series analysis.
@@ -506,21 +506,21 @@ registerWaveJourneys () =
         grains = stepSource ()
         table = synth::Wavetable(size = 2048, harmonics = 1, frames = [synth::TableFrame(levels = [])])
         named = [
-            { n = Components::samplePlayer (1, grains), title = "Sample" }, { n = Components::granular (1, grains, 4, 1), title = "Grain cloud" },
-            { n = Components::lfo (1, 1.0), title = "LFO" }, { n = Components::modulatedGain (1, 2, 1.0), title = "Modulated gain" },
-            { n = Components::midiNote (1, 60.0, 1.0, 240.0), title = "MIDI notes" }, { n = Components::stereo 1, title = "Mono to stereo" },
-            { n = Components::panner (1, 2, 0.0), title = "Panner" }, { n = Components::split (1, 2), title = "Channel split" },
-            { n = Components::join (1, 2), title = "Channel join" }, { n = Components::sine (1, 440.0), title = "Oscillator" },
-            { n = Components::lowpass (1, 1000.0, 0.7), title = "Filter" }, { n = Components::gain (1, 1.0), title = "Gain" },
-            { n = Components::mixer 1, title = "Mixer" }, { n = Components::output 1, title = "Output" },
-            { n = Components::delay (1, 64), title = "Delay" }, { n = Components::exciter (1, 1), title = "Exciter" },
-            { n = Components::resonator (1, 440.0), title = "Resonator" }, { n = Components::waveguide (1, 220.0, 512), title = "Waveguide string" },
-            { n = Components::fractionalDelay (1, 2.5, 16), title = "Fractional delay" }, { n = Components::lossFilter (1, 0.9, 0.5), title = "Loss filter" },
-            { n = Components::allpass (1, 0.5), title = "Allpass dispersion" }, { n = Components::wavetable (1, table, 220.0), title = "Wavetable" },
-            { n = Components::additive (1, 220.0), title = "Additive partials" }, { n = Components::spectral (1, 1024, 256, 6.0), title = "Spectral processor" },
-            { n = Components::shaper (1, 0.0, 1.0), title = "Waveshaper" }, { n = Components::reverb (1, 2.0), title = "FDN reverb" },
-            { n = Components::shifter (1, 10.0), title = "Frequency shifter" }, { n = Components::phaseOperator (1, 220.0, 0.0), title = "Phase operator" },
-            { n = Components::bowed (1, 220.0, 512), title = "Bowed string" }, { n = Components::smoother (1, 0.01), title = "Smoother" },
-            { n = Components::strikeComb (1, 220.0, 512), title = "Strike comb" }, { n = Components::downmix 1, title = "Stereo to mono" }]
+        { n = Components::samplePlayer (1, grains), title = "Sample" }, { n = Components::granular (1, grains, 4, 1), title = "Grain cloud" },
+        { n = Components::lfo (1, 1.0), title = "LFO" }, { n = Components::modulatedGain (1, 2, 1.0), title = "Modulated gain" },
+        { n = Components::midiNote (1, 60.0, 1.0, 240.0), title = "MIDI notes" }, { n = Components::stereo 1, title = "Mono to stereo" },
+        { n = Components::panner (1, 2, 0.0), title = "Panner" }, { n = Components::split (1, 2), title = "Channel split" },
+        { n = Components::join (1, 2), title = "Channel join" }, { n = Components::sine (1, 440.0), title = "Oscillator" },
+        { n = Components::lowpass (1, 1000.0, 0.7), title = "Filter" }, { n = Components::gain (1, 1.0), title = "Gain" },
+        { n = Components::mixer 1, title = "Mixer" }, { n = Components::output 1, title = "Output" },
+        { n = Components::delay (1, 64), title = "Delay" }, { n = Components::exciter (1, 1), title = "Exciter" },
+        { n = Components::resonator (1, 440.0), title = "Resonator" }, { n = Components::waveguide (1, 220.0, 512), title = "Waveguide string" },
+        { n = Components::fractionalDelay (1, 2.5, 16), title = "Fractional delay" }, { n = Components::lossFilter (1, 0.9, 0.5), title = "Loss filter" },
+        { n = Components::allpass (1, 0.5), title = "Allpass dispersion" }, { n = Components::wavetable (1, table, 220.0), title = "Wavetable" },
+        { n = Components::additive (1, 220.0), title = "Additive partials" }, { n = Components::spectral (1, 1024, 256, 6.0), title = "Spectral processor" },
+        { n = Components::shaper (1, 0.0, 1.0), title = "Waveshaper" }, { n = Components::reverb (1, 2.0), title = "FDN reverb" },
+        { n = Components::shifter (1, 10.0), title = "Frequency shifter" }, { n = Components::phaseOperator (1, 220.0, 0.0), title = "Phase operator" },
+        { n = Components::bowed (1, 220.0, 512), title = "Bowed string" }, { n = Components::smoother (1, 0.01), title = "Smoother" },
+        { n = Components::strikeComb (1, 220.0, 512), title = "Strike comb" }, { n = Components::downmix 1, title = "Stereo to mono" }]
         forEachList (named, \c => expect (synth::Descriptors::title c.n.processor, c.title))))
     test ("sample, impulse and table resources carry a content identity: name, 64-bit hash, channels, rate, frames and version, and a changed or renamed resource is refused [SYNTH-ADVANCED-CORE-RESOURCES]", \() => arithmetic identityJourney)

@@ -155,9 +155,9 @@ module PatchVoices
         false => signalflow::Repository::path path
 
     fromFile path = match fileSize path
-            Error why => Error(message = why)
-            Success size => chained (Projects::limited (size, 12, 8388608, "Choose a WAV file between 12 bytes and 8 MiB."), \within =>
-                chained (readFileBytes (path, 0, satAdd within 1), \bytes => decoded (path, within, bytes)))
+        Error why => Error(message = why)
+        Success size => chained (Projects::limited (size, 12, 8388608, "Choose a WAV file between 12 bytes and 8 MiB."), \within =>
+            chained (readFileBytes (path, 0, satAdd within 1), \bytes => decoded (path, within, bytes)))
 
     (** The last part of a path: what Perception Studio shows for an imported sample. *)
     export fileName path = foldList (split (replace path "\\" "/" ?: path) "/" ?: [path], path, \(_, part) => part)
@@ -268,4 +268,3 @@ module PatchVoices
     export enveloped routing = match routing.attack >= 0.001 && routing.attack <= 10.0 && routing.release >= 0.001 && routing.release <= 10.0
         false => Error(message = "A routing's attack and release must be 0.001 to 10 s.")
         true => ok routing
-
