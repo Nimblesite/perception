@@ -28,7 +28,7 @@ bool snapshot(osprey::vst::Plugin& plugin, const std::string& id) {
     const auto n = component.getSize(), m = editor.getSize();
     if (n < 0 || m < 0 || n > stateLimit - 41 || m > stateLimit - 41 - n) return false;
     std::string bytes = "OPS1" + id;
-    for (unsigned i = 0; i < 4; ++i) bytes.push_back(static_cast<char>(n >> (8*i)));
+    for (unsigned i = 0; i < 4; ++i) bytes.push_back(static_cast<char>(n >> (8 * i)));
     bytes.push_back(status == kResultOk);
     if (n) bytes.append(component.getData(), n);
     if (m) bytes.append(editor.getData(), m);
@@ -40,11 +40,11 @@ bool recover(osprey::vst::Plugin& plugin, const std::string& id, std::string& by
     plugin.error = "Malformed VST3 state or mismatched plug-in class";
     if (bytes.size() < 41 || bytes.compare(4, 32, id) != 0) return false;
     size_t n = 0;
-    for (unsigned i = 0; i < 4; ++i) n |= size_t(static_cast<unsigned char>(bytes[36+i])) << (8*i);
-    if (n > bytes.size()-41 || (bytes[40] != 0 && bytes[40] != 1)) return false;
-    const auto m = bytes.size()-41-n;
+    for (unsigned i = 0; i < 4; ++i) n |= size_t(static_cast<unsigned char>(bytes[36 + i])) << (8 * i);
+    if (n > bytes.size() - 41 || (bytes[40] != 0 && bytes[40] != 1)) return false;
+    const auto m = bytes.size() - 41 - n;
     if (!bytes[40] && m) return false;
-    MemoryStream component(bytes.data()+41, n), editor(bytes.data()+41+n, m);
+    MemoryStream component(bytes.data() + 41, n), editor(bytes.data() + 41 + n, m);
     const auto controller = plugin.provider->getControllerPtr();
     plugin.error = "Plug-in rejected the saved VST3 state";
     if (plugin.component->setState(&component) != kResultOk) return false;
@@ -66,7 +66,7 @@ bool transaction(osprey::vst::Plugin& plugin, const std::string& bytes) {
     if (!std::cout) plugin.error = "Text stream output failed";
     return bool(std::cout);
 }
-}
+} // namespace
 
 int streamText(const std::string& path, const std::string& identifier, bool session) {
     osprey::vst::Plugin plugin;
@@ -83,7 +83,8 @@ int streamText(const std::string& path, const std::string& identifier, bool sess
         } else if (session && bytes.starts_with("OPS1")) {
             if (!recover(plugin, identifier, bytes)) return failed(plugin.error);
             encoded("OK");
-        } else if (!transaction(plugin, bytes)) return failed(plugin.error);
+        } else if (!transaction(plugin, bytes))
+            return failed(plugin.error);
         if (session) std::cout << '\n';
         std::cout.flush();
         if (!std::cout) return failed("Text stream output failed");

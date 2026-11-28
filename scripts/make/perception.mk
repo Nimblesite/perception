@@ -20,10 +20,12 @@ canary: $(if $(filter Darwin,$(UNAME_S)),_runtime_macos_arc)
 	$(BIN) build src/studio/render --memory=arc --quiet -o target/daw/daw
 	$(if $(filter Darwin,$(UNAME_S)),OSPREY_BIN="$(CURDIR)/$(BIN)" bash src/studio/run.sh --smoke)
 
-## lint: Every Perception project checked with warnings as errors: one warning fails the build [CI-LINT].
+## lint: Every Perception project checked with warnings as errors, and every Osprey source formatted: one
+##       warning or one unformatted file fails the build [CI-LINT]. scripts/lint.sh checks everything else.
 LINT_PROJECTS := src/synth src/synth/tests src/studio src/studio/render src/studio/test
 lint:
 	$(foreach project,$(LINT_PROJECTS),nice $(BIN) --check --warnings-as-errors $(project) &&) true
+	$(BIN) fmt --check src/synth src/studio
 
 ## compiler: The C runtime archives and the release osprey binary this product builds with.
 compiler: _runtime

@@ -3,7 +3,8 @@ name: CI
 # Perception builds inside an Osprey workspace [REPO-SPLIT]: ospreylang at the tag in scripts/osprey-version,
 # with this repository laid over it at the same paths (scripts/workspace.sh). The compiler is built
 # from that tag in the workspace, cached by ospreylang's own setup action. Three phases, each once:
-# build and check, the canary on Linux and macOS with line coverage plus the synthesis proofs, then the coverage gate.
+# build, lint and check; the canary on Linux and macOS with line coverage, the synthesis proofs and the VST3
+# worker; then the coverage gate.
 on:
   pull_request:
   push:
@@ -41,9 +42,15 @@ jobs:
           git rm -r -q --cached .
           xargs -d "\n" git add -f -- < .split/paths
           make _check_programs
-      # [CI-LINT] Every Perception project, with warnings as errors: one warning fails CI.
-      - name: Lint
+      # [CI-LINT] Every Perception project with warnings as errors, and every Osprey source formatted.
+      - name: Lint Osprey
         run: make -f scripts/make/perception.mk lint
+      - uses: astral-sh/setup-uv@v10
+      - name: Install deslop
+        run: bash scripts/ci/install-deslop.sh "$RUNNER_TEMP/bin"
+      # [CI-LINT] paths, shell, Python, C/C++, JavaScript and the duplication gate, at pinned tool versions.
+      - name: Lint everything else
+        run: .split/scripts/lint.sh
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
@@ -131,6 +138,19 @@ jobs:
       - name: Synthesis and production DSP proofs
         run: make -f scripts/make/perception.mk synth-proofs
 
+  # [SYNTH-HOST-VST] Perception Modular against the pinned official SDK: the SDK validator, then the
+  # worker's scan, stream, state and device-queue checks (macOS is the verified platform).
+  vst:
+    name: "VST3 worker (macOS)"
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - *checkout
+      - *workspace
+      - name: Build and test the worker
+        run: make -f scripts/make/perception.mk _synth_vst_test
+
   # Reads the reports the test jobs wrote; runs nothing.
   coverage:
     name: Coverage
@@ -153,8 +173,8 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [build, test, proofs, coverage]
+    needs: [build, test, proofs, vst, coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job
-        run: test "${{ needs.build.result }}" = success && test "${{ needs.test.result }}" = success && test "${{ needs.proofs.result }}" = success && test "${{ needs.coverage.result }}" = success
+        run: test "${{ needs.build.result }}" = success && test "${{ needs.test.result }}" = success && test "${{ needs.proofs.result }}" = success && test "${{ needs.vst.result }}" = success && test "${{ needs.coverage.result }}" = success

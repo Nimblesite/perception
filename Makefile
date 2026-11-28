@@ -16,9 +16,10 @@ help:
 studio: _workspace
 	$(RUN) studio
 
-## lint: Check every project with warnings as errors; one warning fails.
+## lint: Every check but the tests: warnings as errors, formatting of every language, paths, duplication.
 lint: _workspace
 	$(RUN) lint
+	scripts/lint.sh
 
 ## test: The canary: synth package and Studio journeys, the song renderer, and the macOS host smoke.
 test: _workspace
@@ -26,6 +27,7 @@ test: _workspace
 
 ## ci: The compiler at scripts/osprey-version, lint, the canary, then the website.
 ci: _workspace
+	scripts/lint.sh
 	$(RUN) perception-ci
 
 ## website: Build the website into src/studio/website/_site.

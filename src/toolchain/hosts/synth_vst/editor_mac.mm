@@ -13,7 +13,7 @@ namespace {
 using namespace osprey::vst;
 constexpr size_t maxLine = 131072;
 class Frame final : public U::Implements<U::Directly<IPlugFrame>> {
-public:
+  public:
     NSWindow* window = nil;
     tresult PLUGIN_API resizeView(IPlugView* view, ViewRect* size) override {
         if (!view || !size || !valid(*size)) return kInvalidArgument;
@@ -27,7 +27,7 @@ public:
 };
 
 class EditorHandler final : public U::Implements<U::Directly<IComponentHandler>> {
-public:
+  public:
     tresult PLUGIN_API beginEdit(ParamID) override { return kResultOk; }
     tresult PLUGIN_API performEdit(ParamID id, ParamValue value) override {
         if (!std::isfinite(value) || value < 0 || value > 1 || (!edits.contains(id) && edits.size() >= 1024))
@@ -37,11 +37,11 @@ public:
     }
     tresult PLUGIN_API endEdit(ParamID) override { return kResultOk; }
     tresult PLUGIN_API restartComponent(int32) override { return kResultOk; }
-    std::map<ParamID,double> edits;
+    std::map<ParamID, double> edits;
 };
 
 class VendorWindow {
-public:
+  public:
     Plugin plugin;
     IPtr<EditorHandler> handler = owned(new EditorHandler);
     IPtr<IEditController> controller;
@@ -66,9 +66,11 @@ public:
         NSString* title = @"VST3 Editor";
         for (const auto& info : plugin.module->getFactory().classInfos())
             if (info.ID().toString() == id) title = [NSString stringWithUTF8String:info.name().c_str()];
-        frame->window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,size.getWidth(),size.getHeight())
-            styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-            backing:NSBackingStoreBuffered defer:NO];
+        frame->window = [[NSWindow alloc]
+            initWithContentRect:NSMakeRect(0, 0, size.getWidth(), size.getHeight())
+                      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
+                        backing:NSBackingStoreBuffered
+                          defer:NO];
         frame->window.releasedWhenClosed = NO;
         frame->window.title = title;
         NSView* container = [[NSView alloc] initWithFrame:frame->window.contentView.bounds];
@@ -90,14 +92,14 @@ public:
         const auto split = token.find('=');
         if (split == std::string::npos) return false;
         ParamID id{};
-        const auto parsed = std::from_chars(token.data(), token.data()+split, id);
-        if (parsed.ec != std::errc{} || parsed.ptr != token.data()+split) return false;
+        const auto parsed = std::from_chars(token.data(), token.data() + split, id);
+        if (parsed.ec != std::errc{} || parsed.ptr != token.data() + split) return false;
         char* end = nullptr;
-        const char* number = token.c_str()+split+1;
+        const char* number = token.c_str() + split + 1;
         const double value = std::strtod(number, &end);
         if (end == number || *end || !std::isfinite(value) || value < 0 || value > 1) return false;
         if (!authored.contains(id) || authored[id] != value) {
-            if (controller->getParamNormalized(id) != value && controller->setParamNormalized(id,value) != kResultOk)
+            if (controller->getParamNormalized(id) != value && controller->setParamNormalized(id, value) != kResultOk)
                 return false;
             handler->edits.erase(id);
             authored[id] = value;
@@ -109,13 +111,18 @@ public:
         std::string command;
         request >> command;
         if (command != "watch" && command != "focus" && command != "close") return false;
-        if (command == "focus") { [frame->window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES]; }
+        if (command == "focus") {
+            [frame->window makeKeyAndOrderFront:nil];
+            [NSApp activateIgnoringOtherApps:YES];
+        }
         if (command == "close") [frame->window close];
-        for (std::string token; request >> token;) if (!apply(token) || authored.size() > 1024) return false;
+        for (std::string token; request >> token;)
+            if (!apply(token) || authored.size() > 1024) return false;
         std::ostringstream out;
         out << "{\"width\":" << frame->window.contentView.bounds.size.width
             << ",\"height\":" << frame->window.contentView.bounds.size.height
-            << ",\"window\":" << frame->window.windowNumber << ",\"closed\":" << (frame->window.visible ? "false" : "true") << ",\"values\":[";
+            << ",\"window\":" << frame->window.windowNumber
+            << ",\"closed\":" << (frame->window.visible ? "false" : "true") << ",\"values\":[";
         bool first = true;
         for (const auto& [id, _] : authored) {
             const auto native = handler->edits.find(id);
@@ -151,7 +158,7 @@ int service(VendorWindow& editor, std::string& pending) {
     }
     return -1;
 }
-}
+} // namespace
 int editPlugin(const std::string& path, const std::string& identifier) {
     @autoreleasepool {
         [NSApplication sharedApplication];
@@ -163,10 +170,12 @@ int editPlugin(const std::string& path, const std::string& identifier) {
         __block int status = -1;
         VendorWindow* active = &editor;
         std::string* buffer = &pending;
-        NSTimer* timer = [NSTimer timerWithTimeInterval:0.04 repeats:YES block:^(NSTimer*) {
-            status = service(*active, *buffer);
-            if (status >= 0) [NSApp stop:nil];
-        }];
+        NSTimer* timer = [NSTimer timerWithTimeInterval:0.04
+                                                repeats:YES
+                                                  block:^(NSTimer*) {
+                                                    status = service(*active, *buffer);
+                                                    if (status >= 0) [NSApp stop:nil];
+                                                  }];
         [NSRunLoop.mainRunLoop addTimer:timer forMode:NSRunLoopCommonModes];
         [NSApp run];
         [timer invalidate];
