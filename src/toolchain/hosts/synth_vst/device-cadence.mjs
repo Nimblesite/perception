@@ -40,11 +40,15 @@ async function exchange(command) {
 
 try {
   let receipt;
+  const recent = [];
   for (let i = 1; i <= 900; ++i) {
+    const sent = performance.now();
     receipt = await exchange(line);
+    recent.push(`${(performance.now() - sent).toFixed(1)}ms/q${receipt.queuedFrames}`);
+    if (recent.length > 12) recent.shift();
     assert.equal(receipt.acceptedFrames, i * frames);
     assert.equal(receipt.running, i >= 2);
-    assert.ok(receipt.queuedFrames <= 960, 'steady playback must accept at most 20 ms ahead of a live edit');
+    assert.ok(receipt.queuedFrames <= 960, `steady playback must accept at most 20 ms ahead of a live edit (block ${i}; round trips ${recent.join(' ')})`);
   }
   assert.equal(receipt.emptyCallbacks, 0, 'the device ran empty with prepared audio available');
   const started = events.find((event) => event.event === 'audio.started');
