@@ -21,9 +21,12 @@ canary: $(if $(filter Darwin,$(UNAME_S)),_runtime_macos_arc)
 	$(if $(filter Darwin,$(UNAME_S)),OSPREY_BIN="$(CURDIR)/$(BIN)" bash src/studio/run.sh --smoke)
 
 ## perception-lint: Every Perception project checked with warnings as errors, and every Osprey source formatted: one
-##                  warning or one unformatted file fails the build [CI-LINT]. scripts/lint.sh checks everything else.
+##                  warning, one unformatted file or one target sharing an ospreylang target's name (this file
+##                  includes ospreylang's Makefile, where make only warns and silently swaps the recipe) fails the
+##                  build [CI-LINT]. scripts/lint.sh checks everything else.
 LINT_PROJECTS := src/synth src/synth/tests src/studio src/studio/render src/studio/test
 perception-lint:
+	@! $(DAW_MAKE) -n -q compiler 2>&1 >/dev/null | grep "warning: overriding" || { echo "a Perception target shares an ospreylang target's name: rename it [CI-LINT]"; false; }
 	$(foreach project,$(LINT_PROJECTS),nice $(BIN) --check --warnings-as-errors $(project) &&) true
 	$(BIN) fmt --check src/synth src/studio
 

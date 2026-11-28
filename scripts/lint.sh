@@ -15,6 +15,12 @@ echo "==> Every tracked source is laid into the workspace (paths)"
 unlaid=$(tracked src | grep -v -E "^($(paste -sd'|' paths))(/|$)" || true)
 [ -z "$unlaid" ] || { echo "not under any paths entry, so never built or tested:"; echo "$unlaid"; exit 1; }
 
+echo "==> Every action a workflow uses resolves to a published tag or branch"
+grep -rhoE 'uses: [^./][^ ]*@[^ ]+' .github | sort -u | while read -r _ ref; do
+  repo=$(cut -d/ -f1,2 <<<"${ref%@*}")
+  git ls-remote --exit-code "https://github.com/$repo" "refs/tags/${ref#*@}" "refs/heads/${ref#*@}" >/dev/null || { echo "unresolvable: $ref"; exit 1; }
+done
+
 echo "==> Shell"
 tool shellcheck-py==0.11.0.1 shellcheck "${shell[@]}"
 
