@@ -30,7 +30,7 @@ constexpr double sampleRate = 48000;
 // A plug-in can announce layout/latency changes from inside process(). Consume them
 // at the block boundary, before the host reads buffers prepared for the old layout.
 class RestartHandler final : public U::Implements<U::Directly<IComponentHandler>> {
-public:
+  public:
     tresult PLUGIN_API beginEdit(ParamID) override { return kNotImplemented; }
     tresult PLUGIN_API performEdit(ParamID, ParamValue) override { return kNotImplemented; }
     tresult PLUGIN_API endEdit(ParamID) override { return kNotImplemented; }
@@ -39,12 +39,13 @@ public:
         return kResultOk;
     }
     int32 take() { return pending.exchange(0); }
-private:
+
+  private:
     std::atomic<int32> pending{0};
 };
 
 class Plugin {
-public:
+  public:
     VST3::Hosting::Module::Ptr module;
     IPtr<HostApplication> host = owned(new HostApplication);
     IPtr<RestartHandler> restarts = owned(new RestartHandler);
@@ -60,9 +61,11 @@ public:
     bool processing = false;
     std::string error;
     bool acceptsParameter(ParamID id);
-private:
+
+  private:
     std::optional<std::unordered_set<ParamID>> automatableIds;
-public:
+
+  public:
     ~Plugin() {
         if (processing) processor->setProcessing(false);
         if (active) component->setActive(false);
@@ -81,4 +84,4 @@ public:
 
 bool measured(const HostProcessData& data, double& peak);
 void clearAudio(HostProcessData& data, bool impulse);
-}
+} // namespace osprey::vst

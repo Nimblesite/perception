@@ -92,7 +92,6 @@ module PartialBanks
     *)
     export stiffCoefficients (config, stiffness, stretch) = mapList (toList (range (0, capacity)), \index => coefficient (config, index, stiffness, stretch))
 
-
     decayed (config, age, index, spectral) = spectral * TableMath::partialDecay (age, config.decay, config.damping, toFloat (satAdd index 1), config.sampleRate)
 
     stepped (config, age, phases, index, sample, total, updated) = match listGet phases index

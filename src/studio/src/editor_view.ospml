@@ -269,12 +269,12 @@ module EditorView
             true => placeAdded added
 
     dropped (editor, kind, px, py) = match px >= 205.0 && CanvasGeometry::valid (px, py)
-            false => editor
-            true =>
-                added = EditorState::tapped (editor, Add(kind = kind))
-                match added.nextIdentity > editor.nextIdentity
-                    false => added
-                    true => EditorLayout::drag (added(dragging = added.selected, paletteShown = false, grabX = 0.0, grabY = 0.0), px, py, false)
+        false => editor
+        true =>
+            added = EditorState::tapped (editor, Add(kind = kind))
+            match added.nextIdentity > editor.nextIdentity
+                false => added
+                true => EditorLayout::drag (added(dragging = added.selected, paletteShown = false, grabX = 0.0, grabY = 0.0), px, py, false)
 
     (** Palette drops, card dragging and cable edits all change the same patch. *)
     export pointed (editor, px, py, down) = match editor.wireDragging
@@ -442,11 +442,11 @@ module EditorView
         playing = editor.songTicket != ""
         last = satSub (length editor.song.tracks) 1
         [
-            Ui::section ("File", "", [command (editor, "Settings…", "settings", true, ShowSettings), command (editor, "Open Song…", "open", true, OpenTrack(index = -2)), command (editor, "Save", "save", true, SaveProject), command (editor, "Render Song", "render", song, RenderSong)]),
-            Ui::section ("Edit", "", [command (editor, "Undo", "undo", length editor.past > 0, Undo), command (editor, "Redo", "redo", length editor.future > 0, Redo)]),
-            Ui::section ("View", "", [command (editor, "Timeline", "timeline", true, ShowPage(page = TimelinePage)), command (editor, "Track Patch", "patch", true, ShowPage(page = PatchPage)), command (editor, "Bus Routing", "routing", true, ShowPage(page = MixPage)), command (editor, "Modules", "modules", true, ShowModules), command (editor, "Patch Controls", "controls", true, ShowDetails), command (editor, "Zoom In", "zoomIn", song && editor.page == TimelinePage, ZoomLanes(factor = 1.25)), command (editor, "Zoom Out", "zoomOut", song && editor.page == TimelinePage, ZoomLanes(factor = 0.8)), command (editor, "Zoom to Fit", "zoomFit", song && editor.page == TimelinePage, ZoomLanes(factor = 0.0))]),
-            Ui::section ("Transport", "", [command (editor, "Return to Start", "start", song, MoveStart(bar = 0)), command (editor, "Play Song", "playSong", song && !playing, PlaySong), command (editor, "Stop Song", "stopSong", playing, StopSong), command (editor, "Loop", "loop", song && !playing, ToggleLoop), command (editor, "Previous Track", "previousTrack", song && editor.track > 0, PickTrack(index = satSub editor.track 1, bar = editor.rollBar)), command (editor, "Next Track", "nextTrack", song && editor.track < last, PickTrack(index = satAdd editor.track 1, bar = editor.rollBar)), command (editor, "Previous Bar", "previousBar", song && editor.rollBar > 0, PickTrack(index = editor.track, bar = satSub editor.rollBar 1)), command (editor, "Next Bar", "nextBar", song, PickTrack(index = editor.track, bar = satAdd editor.rollBar 1))]),
-            Ui::section ("Shortcuts", "", listAppend (mapList (Keymaps::names, \name => keymapChoice (editor, name))) (Ui::button ("Load From File…", "", LoadKeymap)))]
+        Ui::section ("File", "", [command (editor, "Settings…", "settings", true, ShowSettings), command (editor, "Open Song…", "open", true, OpenTrack(index = -2)), command (editor, "Save", "save", true, SaveProject), command (editor, "Render Song", "render", song, RenderSong)]),
+        Ui::section ("Edit", "", [command (editor, "Undo", "undo", length editor.past > 0, Undo), command (editor, "Redo", "redo", length editor.future > 0, Redo)]),
+        Ui::section ("View", "", [command (editor, "Timeline", "timeline", true, ShowPage(page = TimelinePage)), command (editor, "Track Patch", "patch", true, ShowPage(page = PatchPage)), command (editor, "Bus Routing", "routing", true, ShowPage(page = MixPage)), command (editor, "Modules", "modules", true, ShowModules), command (editor, "Patch Controls", "controls", true, ShowDetails), command (editor, "Zoom In", "zoomIn", song && editor.page == TimelinePage, ZoomLanes(factor = 1.25)), command (editor, "Zoom Out", "zoomOut", song && editor.page == TimelinePage, ZoomLanes(factor = 0.8)), command (editor, "Zoom to Fit", "zoomFit", song && editor.page == TimelinePage, ZoomLanes(factor = 0.0))]),
+        Ui::section ("Transport", "", [command (editor, "Return to Start", "start", song, MoveStart(bar = 0)), command (editor, "Play Song", "playSong", song && !playing, PlaySong), command (editor, "Stop Song", "stopSong", playing, StopSong), command (editor, "Loop", "loop", song && !playing, ToggleLoop), command (editor, "Previous Track", "previousTrack", song && editor.track > 0, PickTrack(index = satSub editor.track 1, bar = editor.rollBar)), command (editor, "Next Track", "nextTrack", song && editor.track < last, PickTrack(index = satAdd editor.track 1, bar = editor.rollBar)), command (editor, "Previous Bar", "previousBar", song && editor.rollBar > 0, PickTrack(index = editor.track, bar = satSub editor.rollBar 1)), command (editor, "Next Bar", "nextBar", song, PickTrack(index = editor.track, bar = satAdd editor.rollBar 1))]),
+        Ui::section ("Shortcuts", "", listAppend (mapList (Keymaps::names, \name => keymapChoice (editor, name))) (Ui::button ("Load From File…", "", LoadKeymap)))]
 
     routeInspector (editor, content) =
         frame = ui::Frames::plain

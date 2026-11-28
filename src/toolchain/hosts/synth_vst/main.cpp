@@ -23,9 +23,15 @@ std::string quoted(const std::string& value) {
     constexpr char hex[] = "0123456789abcdef";
     std::string result = "\"";
     for (unsigned char c : value) {
-        if (c == '\"' || c == '\\') { result += '\\'; result += static_cast<char>(c); }
-        else if (c < 32) { result += "\\u00"; result += hex[c >> 4]; result += hex[c & 15]; }
-        else result += static_cast<char>(c);
+        if (c == '\"' || c == '\\') {
+            result += '\\';
+            result += static_cast<char>(c);
+        } else if (c < 32) {
+            result += "\\u00";
+            result += hex[c >> 4];
+            result += hex[c & 15];
+        } else
+            result += static_cast<char>(c);
     }
     return result + '\"';
 }
@@ -44,8 +50,8 @@ int scan(const std::string& path) {
     for (const auto& info : module->getFactory().classInfos()) {
         if (info.category() != kVstAudioEffectClass) continue;
         std::cout << "{\"event\":\"vst.class\",\"id\":" << quoted(info.ID().toString())
-                  << ",\"bundle\":" << quoted(path) << ",\"name\":" << quoted(info.name()) << ",\"categories\":"
-                  << quoted(info.subCategoriesString()) << "}\n";
+                  << ",\"bundle\":" << quoted(path) << ",\"name\":" << quoted(info.name())
+                  << ",\"categories\":" << quoted(info.subCategoriesString()) << "}\n";
         ++count;
     }
     return count ? 0 : failed("The module contains no VST3 audio components.");
@@ -69,7 +75,7 @@ int discover(const std::filesystem::path& root) {
     std::cout << "]\n";
     return 0;
 }
-}
+} // namespace
 
 int main(int argc, char** argv) {
     // Transactions flush explicitly. A tied stdin would flush stdout for every
@@ -90,10 +96,10 @@ int main(int argc, char** argv) {
         if (argc == 4 && std::string(argv[1]) == "probe") return probe(argv[2], argv[3]);
         if (argc == 3 && std::string(argv[1]) == "list") return discover(argv[2]);
         if (argc == 3 && std::string(argv[1]) == "scan") return scan(argv[2]);
-        return failed("Usage: osprey-vst-worker audio-device | list <folder> | scan <plugin.vst3> | describe|probe|verify-state|verify-restart|stream|stream-text|stream-session <plugin.vst3> <class-id>");
-    } catch (const std::exception& error) {
-        return failed(error.what());
-    } catch (...) {
+        return failed(
+            "Usage: osprey-vst-worker audio-device | list <folder> | scan <plugin.vst3> | "
+            "describe|probe|verify-state|verify-restart|stream|stream-text|stream-session <plugin.vst3> <class-id>");
+    } catch (const std::exception& error) { return failed(error.what()); } catch (...) {
         return failed("Native plug-in threw an unknown exception.");
     }
 }

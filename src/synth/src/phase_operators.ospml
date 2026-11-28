@@ -169,4 +169,3 @@ module PhaseOperators
             second = next (doubled, first.next, modulation, sync)
             down = Sequences::shifted (Sequences::shifted (held.down, first.sample), second.sample)
             Success(value = OversampledOperatorSample(sample = Oversamplers::filtered down, next = OversampledOperator(operator = second.next, down = down)))
-

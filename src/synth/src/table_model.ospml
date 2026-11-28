@@ -69,4 +69,3 @@ type PartialSchedule =
     FixedPartials
         settings : PartialSettings
         coefficients : List<PartialCoefficient>
-

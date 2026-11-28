@@ -1,8 +1,12 @@
 [project]
 name = "daw-render"
-source_roots = ["../../synth/src", "main.ospml", "shell.ospml", "player.ospml", "stream.ospml", "note_cache.ospml", "../src/arrangements.ospml", "../src/playback.ospml", "../src/send_renders.ospml", "../src/bus_mix.ospml", "../src/daw_model.ospml", "../src/note_renders.ospml", "../src/patch_voices.ospml", "../src/plugin_documents.ospml", "../src/editor_model.ospml", "../src/song_files.ospml", "../src/project_codec.ospml", "../src/projects.ospml", "../src/arrange_math.ospml", "../../osprey/packages/json/src", "../../osprey/packages/manager/core/src/bytes.osp", "../../osprey/packages/manager/core/src/sha256.osp", "../../osprey/packages/native/src/base.ospml", "../../osprey/packages/native/src/document.ospml", "../../osprey/packages/signal_flow/src/repository.ospml", "../../osprey/packages/graphics/src/scene.ospml"]
+source_roots = ["../../synth/src", "main.ospml", "shell.ospml", "player.ospml", "stream.ospml", "note_cache.ospml", "../src/arrangements.ospml", "../src/playback.ospml", "../src/send_renders.ospml", "../src/bus_mix.ospml", "../src/daw_model.ospml", "../src/note_renders.ospml", "../src/patch_voices.ospml", "../src/plugin_documents.ospml", "../src/editor_model.ospml", "../src/song_files.ospml", "../src/project_codec.ospml", "../src/projects.ospml", "../src/arrange_math.ospml", "../../osprey/packages/json/src", "sha256.osp", "../../osprey/packages/native/src/base.ospml", "../../osprey/packages/native/src/document.ospml", "../../osprey/packages/signal_flow/src/repository.ospml", "../../osprey/packages/graphics/src/scene.ospml"]
 default_namespace = "app"
 entry = "main.ospml"
 
 [modules]
 allow_wildcard_imports = false
+
+# An application: its exports are its own, so they need no example [DOC-EXPORT-EXAMPLE-REQUIRED]
+[lints]
+unexampled-export = "allow"

@@ -1,0 +1,130 @@
+// Checks every journey file shares: outcomes that continue past a failed expectation, rows of one pure
+// function, and the receipts, presets and fixtures more than one journey asserts against.
+import synth::Graphs
+import synth::Observations
+
+// `outcome`'s value handed to `consume`, or `fallback` once its refusal's detail is checked against `why`.
+outcomeOr (outcome, why, fallback, consume) = match outcome
+    Error fault =>
+        expect (synth::Faults::detail fault, why)
+        fallback
+    Success value => consume value
+
+// A refused journey step reports its detail exactly and falls back to the given value.
+journeyOr (outcome, why, fallback) = outcomeOr (outcome, why, fallback, \value => value)
+
+// `outcome`'s value handed to `check`; a refusal here is unexpected, so an Error fails the journey outright.
+successOr (outcome, check) = match outcome
+    Error _ => unexpected ()
+    Success value => check value
+
+// `outcome`'s value handed to `check`; a refusal's detail is reported against `why` and the journey fails there.
+detailOr (outcome, why, check) = match outcome
+    Error fault =>
+        expect (synth::Faults::detail fault, why)
+        unexpected ()
+    Success value => check value
+
+// A first-revision edit of `node`'s `key` to `value`, landing on frame `at`.
+editAt (node, key, value, at) = synth::ParameterChange(node = node, key = key, value = value, revision = 0, samplePosition = at)
+
+// An automated render's observation: its revision and the frame it stopped at.
+observedAt (played, revision, position) =
+    expect (played.observation.revision, revision)
+    expect (played.observation.samplePosition, position)
+
+// A run after one more step: the processor's new state and the step's sample appended to its output.
+appended (run, held, sample) = { held = held, samples = listAppend run.samples sample }
+
+// Rows of one one-argument function: each row is `[argument, want]`, met when `f` lands within `tolerance` of `want`.
+near1 (f, rows, tolerance) = forEachList (rows, \row =>
+    match row
+        [a, want] => near (f a, want, tolerance)
+        _ => expect (length row, 2))
+
+// Rows of one two-argument function: each row is `[a, b, want]`.
+near2 (f, rows, tolerance) = forEachList (rows, \row =>
+    match row
+        [a, b, want] => near (f (a, b), want, tolerance)
+        _ => expect (length row, 3))
+
+// Rows of one three-argument function: each row is `[a, b, c, want]`.
+near3 (f, rows, tolerance) = forEachList (rows, \row =>
+    match row
+        [a, b, c, want] => near (f (a, b, c), want, tolerance)
+        _ => expect (length row, 4))
+
+validArithmetic = "valid arithmetic"
+
+// [SYNTH-PCM-FLOAT] Independent character search checks every ASCII decoder boundary.
+hexDigitCase code =
+    character = fromCodePoint code ?: "invalid"
+    match indexOf "0123456789ABCDEF" character
+        Error _ => renderRefused (synth::PcmWords::read32 ("0${character}000000", 0))
+        Success digit => match synth::PcmWords::read32 ("0${character}000000", 0)
+            Error _ => unexpected ()
+            Success word => expect (word, digit)
+
+arithmetic work =
+    handle Arith
+        overflow _ _ _ wrapped =>
+            expect ("overflow", validArithmetic)
+            wrapped
+        divideByZero _ _ =>
+            expect ("division by zero", validArithmetic)
+            0.0
+        remainderByZero _ =>
+            expect ("remainder by zero", validArithmetic)
+            0
+    work ()
+
+accepted outcome = match outcome
+    synth::Valid graph => graph
+    synth::Invalid _ =>
+        expect (false, true)
+        Graphs::empty
+
+refused (outcome, expected) = match outcome
+    synth::Invalid actual => expect (actual == expected, true)
+    synth::Valid _ => unexpected ()
+
+valid (outcome, check) = match outcome
+    synth::Valid value => check value
+    synth::Invalid _ => unexpected ()
+
+prepared (graph, count) = valid (Graphs::prepare graph, \plan => expect (length plan.order, count))
+
+observed snapshot =
+    handle static Signal<synth::Observation>
+        read => snapshot
+    expect (Observations::parameter (10, "cutoff") ?: -1.0, 440.0)
+    expect (Observations::parameter (20, "cutoff") ?: -1.0, 880.0)
+    succeeds (Observations::component 10, \component => expect (component.activeVoices, 3))
+    renderRefused (Observations::component 99)
+    renderRefused (Observations::parameter (30, "cutoff"))
+
+// [SYNTH-DSP] Numerical isolation is required: these paths must not need a host, UI or device.
+
+near (actual, expected, tolerance) = expect (abs (actual - expected) <= tolerance, true)
+
+sameStructure (actual, expected) = expect (structuralEquals (actual, expected), true)
+
+unexpected () = expect (false, true)
+
+tau = 6.283185307179586
+
+pi = 3.141592653589793
+
+rate = 48000.0
+
+sineWave (frequency, i) = sin (tau * frequency * toFloat i / rate)
+
+// The sine of `x` whole turns.
+turn x = sin (tau * x)
+
+sineAt (gain, frequency, i) = gain * sineWave (frequency, i)
+
+absSum samples = foldList (samples, 0.0, \(sum, value) => sum + abs value)
+
+// The largest magnitude in `samples`, or `start` when every sample is smaller.
+peakFrom (start, samples) = foldList (samples, start, \(peak, sample) => synth::TableMath::larger (peak, abs sample))

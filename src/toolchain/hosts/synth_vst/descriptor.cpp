@@ -37,8 +37,8 @@ bool parameters(osprey::vst::Plugin& plugin, std::ostream& out) {
     for (int32 index = 0; index < count; ++index) {
         ParameterInfo parameter{};
         if (controller->getParameterInfo(index, parameter) != kResultOk) return false;
-        if ((parameter.flags & ParameterInfo::kIsHidden) ||
-            (parameter.flags == 0 && midi.count(parameter.id))) continue;
+        if ((parameter.flags & ParameterInfo::kIsHidden) || (parameter.flags == 0 && midi.count(parameter.id)))
+            continue;
         if (shown >= maxControls) return false;
         const auto initial = controller->getParamNormalized(parameter.id);
         if (!std::isfinite(initial) || initial < 0 || initial > 1) return false;
@@ -46,28 +46,32 @@ bool parameters(osprey::vst::Plugin& plugin, std::ostream& out) {
         out << "{\"id\":" << parameter.id << ",\"name\":" << quoted(StringConvert::convert(parameter.title, 128))
             << ",\"unit\":" << quoted(StringConvert::convert(parameter.units, 128))
             << ",\"initial\":" << std::setprecision(17) << initial << ",\"automatable\":"
-            << ((parameter.flags & ParameterInfo::kCanAutomate) && !(parameter.flags & ParameterInfo::kIsReadOnly) ? "true" : "false") << '}';
+            << ((parameter.flags & ParameterInfo::kCanAutomate) && !(parameter.flags & ParameterInfo::kIsReadOnly)
+                    ? "true"
+                    : "false")
+            << '}';
     }
     return true;
 }
 
 bool descriptor(osprey::vst::Plugin& plugin, const std::string& identifier, std::ostream& out) {
-    if (plugin.data.numInputs > 1 || plugin.data.numOutputs != 1 ||
-        plugin.component->getBusCount(kEvent, kInput) > 1) return false;
+    if (plugin.data.numInputs > 1 || plugin.data.numOutputs != 1 || plugin.component->getBusCount(kEvent, kInput) > 1)
+        return false;
     for (const auto& info : plugin.module->getFactory().classInfos()) {
         if (info.ID().toString() != identifier) continue;
         out << "{\"id\":" << quoted(identifier) << ",\"name\":" << quoted(info.name())
             << ",\"latency\":" << plugin.processor->getLatencySamples()
             << ",\"inputs\":" << (plugin.data.numInputs ? plugin.data.inputs[0].numChannels : 0)
-            << ",\"outputs\":" << plugin.data.outputs[0].numChannels << ",\"notes\":"
-            << (plugin.component->getBusCount(kEvent, kInput) ? "true" : "false") << ",\"parameters\":[";
+            << ",\"outputs\":" << plugin.data.outputs[0].numChannels
+            << ",\"notes\":" << (plugin.component->getBusCount(kEvent, kInput) ? "true" : "false")
+            << ",\"parameters\":[";
         if (!parameters(plugin, out)) return false;
         out << "]}";
         return true;
     }
     return false;
 }
-}
+} // namespace
 
 int describePlugin(const std::string& path, const std::string& identifier) {
     osprey::vst::Plugin plugin;

@@ -1,8 +1,12 @@
 [project]
 name = "daw-tests"
-source_roots = ["../../synth/src", ".", "../src", "../render/note_cache.ospml", "../render/shell.ospml", "../../osprey/packages/manager/core/src/bytes.osp", "../../osprey/packages/manager/core/src/sha256.osp", "../../osprey/packages/signal_flow/src", "../../osprey/packages/native/src", "../../osprey/packages/graphics/src", "../../osprey/packages/json/src", "../../osprey/packages/uitest/src"]
+source_roots = ["../../synth/src", ".", "../src", "../render/note_cache.ospml", "../render/shell.ospml", "../render/sha256.osp", "../../osprey/packages/signal_flow/src", "../../osprey/packages/native/src", "../../osprey/packages/graphics/src", "../../osprey/packages/json/src", "../../osprey/packages/uitest/src"]
 default_namespace = "synthtests"
 entry = "main.ospml"
 
 [modules]
 allow_wildcard_imports = false
+
+# An application: its exports are its own, so they need no example [DOC-EXPORT-EXAMPLE-REQUIRED]
+[lints]
+unexampled-export = "allow"

@@ -1,7 +1,6 @@
 import synth::StringVoices
 import synth::Activities
 
-
 // [SYNTH-ADVANCED-PHYSICAL-INSTRUMENTS] The string pool's public journey: preparation, plucking,
 // release tails, explicit stealing, typed refusals and preservation of untouched voices.
 
@@ -20,13 +19,16 @@ poolStep run = match StringVoices::next run.pool
 
 poolRendered (pool, count) = foldList (toList (range (0, count)), { pool = pool, samples = [] }, \(run, _) => poolStep run)
 
-poolEnergy samples = foldList (samples, 0.0, \(total, sample) => total + abs sample)
+poolEnergy samples = absSum samples
 
 heldNotes pool = mapList (filterList (pool.voices, \voice => voice.active), \voice => voice.note)
 
 releasingNotes pool = mapList (filterList (pool.voices, \voice => voice.releasing), \voice => voice.note)
 
 pluckField (pool, note, read) = mapList (filterList (pool.voices, \voice => voice.active && voice.note == note), read)
+
+// A prepared string pool of `voices` voices with `exciter`, each releasing over 50 ms, handed to `check`.
+stringPool (exciter, voices, check) = succeeds (StringVoices::prepare ((poolTemplate ()), exciter, voices, 0.05), check)
 
 // Preparation and every typed refusal at the public boundary.
 poolRejections () =
@@ -37,7 +39,7 @@ poolRejections () =
     forEachList ([0.005, 10.5], \release => refusedAs (StringVoices::prepare ((poolTemplate ()), (poolPluck ()), 2, release), configurationText, "A string pool needs 1-16 voices and a release of 0.01-10 s."))
     forEachList ([template(sampleRate = 4000.0), template(capacity = 4)], \bad => refusedAs (StringVoices::prepare (bad, (poolPluck ()), 2, 0.05), "capacity", "Invalid waveguide controls, or the tuned loop does not fit its capacity."))
     refusedAs (StringVoices::prepare ((poolTemplate ()), pluck(strength = 1.5), 2, 0.05), configurationText, "Invalid exciter strength, duration, interval or colour.")
-    succeeds (StringVoices::prepare ((poolTemplate ()), (poolPluck ()), 3, 0.05), \pool =>
+    stringPool (poolPluck (), 3, \pool =>
         forEachList ([{ note = -1, velocity = 0.5, seed = 7 }, { note = 128, velocity = 0.5, seed = 7 }, { note = 60, velocity = -0.1, seed = 7 }, { note = 60, velocity = 1.1, seed = 7 }, { note = 60, velocity = 0.5, seed = 0 }, { note = 60, velocity = 0.5, seed = 2147483647 }], \bad =>
             refusedAs (StringVoices::noteOn (pool, bad.note, bad.velocity, 220.0, bad.seed), configurationText, "Note, velocity (0-1) or seed is out of range."))
         // A pitch the prepared loop cannot hold is refused, never truncated.
@@ -46,7 +48,7 @@ poolRejections () =
 // One voice sounds after the delay comes around, releases on note-off and frees itself once its
 // release T60 has elapsed; notes nobody holds leave the pool untouched.
 poolRelease () =
-    succeeds (StringVoices::prepare ((poolTemplate ()), (poolPluck ()), 1, 0.05), \pool =>
+    stringPool (poolPluck (), 1, \pool =>
         expect (heldNotes pool, [])
         idleActivity = Activities::strings pool
         idlePanel (idleActivity, 1)
@@ -74,7 +76,7 @@ poolRelease () =
 // Stealing is explicit and ordered: a free voice first, then the voice released longest ago,
 // then the oldest held voice; bystanders keep their note, velocity and age.
 poolStealing () =
-    succeeds (StringVoices::prepare ((poolTemplate ()), (poolPluck ()), 2, 0.05), \pool =>
+    stringPool (poolPluck (), 2, \pool =>
         succeeds (StringVoices::noteOn (pool, 60, 0.8, 220.0, 7), \first =>
             aged = poolRendered (first, 10)
             sameStructure (pluckField (aged.pool, 60, \voice => voice.age), [10])
@@ -102,7 +104,7 @@ poolStealing () =
 
 // The noise seed makes each pluck reproducible: equal seeds render identical output, unequal seeds differ.
 poolSeeded () =
-    succeeds (StringVoices::prepare ((poolTemplate ()), (poolBrush ()), 1, 0.05), \pool =>
+    stringPool (poolBrush (), 1, \pool =>
         succeeds (StringVoices::noteOn (pool, 60, 0.8, 220.0, 991), \held =>
             succeeds (StringVoices::noteOn (pool, 60, 0.8, 220.0, 991), \again =>
                 sameStructure ((poolRendered (held, 400)).samples, (poolRendered (again, 400)).samples))

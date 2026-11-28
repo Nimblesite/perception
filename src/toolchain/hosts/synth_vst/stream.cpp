@@ -18,7 +18,7 @@ bool word(std::istream& input, uint32_t& value) {
 
 void written(std::ostream& output, uint32_t value) {
     const unsigned char bytes[]{static_cast<unsigned char>(value), static_cast<unsigned char>(value >> 8),
-        static_cast<unsigned char>(value >> 16), static_cast<unsigned char>(value >> 24)};
+                                static_cast<unsigned char>(value >> 16), static_cast<unsigned char>(value >> 24)};
     output.write(reinterpret_cast<const char*>(bytes), sizeof(bytes));
 }
 
@@ -39,22 +39,31 @@ bool normalized(std::istream& input, double& value) {
 bool event(std::istream& input, EventList& events, uint32_t frames, uint32_t& previous) {
     uint32_t kind = 0, offset = 0, pitch = 0, channel = 0, identity = 0;
     float velocity = 0;
-    if (!word(input, kind) || !word(input, offset) || !word(input, pitch) || !word(input, channel) || !word(input, identity) || !real(input, velocity)) return false;
+    if (!word(input, kind) || !word(input, offset) || !word(input, pitch) || !word(input, channel) ||
+        !word(input, identity) || !real(input, velocity))
+        return false;
     if ((kind != 1 && kind != 2) || offset >= frames || offset < previous || pitch > 127 || channel > 15 ||
-        identity > uint32_t(std::numeric_limits<int32>::max()) || velocity < 0 || velocity > 1) return false;
+        identity > uint32_t(std::numeric_limits<int32>::max()) || velocity < 0 || velocity > 1)
+        return false;
     previous = offset;
     Event note{};
     note.type = kind == 1 ? Event::kNoteOnEvent : Event::kNoteOffEvent;
     note.sampleOffset = static_cast<int32>(offset);
-    if (kind == 1) note.noteOn = {static_cast<int16>(channel), static_cast<int16>(pitch), 0, velocity, 0, static_cast<int32>(identity)};
-    else note.noteOff = {static_cast<int16>(channel), static_cast<int16>(pitch), velocity, static_cast<int32>(identity), 0};
+    if (kind == 1)
+        note.noteOn = {static_cast<int16>(channel), static_cast<int16>(pitch), 0, velocity, 0,
+                       static_cast<int32>(identity)};
+    else
+        note.noteOff = {static_cast<int16>(channel), static_cast<int16>(pitch), velocity, static_cast<int32>(identity),
+                        0};
     return events.addEvent(note) == kResultOk;
 }
 
 bool parameter(std::istream& input, Plugin& plugin, ParameterChanges& changes, uint32_t frames, uint32_t& previous) {
     uint32_t identity = 0, offset = 0;
     double value = 0;
-    if (!word(input, identity) || !word(input, offset) || !normalized(input, value) || offset >= frames || offset < previous) return false;
+    if (!word(input, identity) || !word(input, offset) || !normalized(input, value) || offset >= frames ||
+        offset < previous)
+        return false;
     previous = offset;
     int32 index = 0;
     auto* queue = plugin.acceptsParameter(identity) ? changes.addParameterData(identity, index) : nullptr;
@@ -70,8 +79,10 @@ bool readBlock(std::istream& input, Plugin& plugin, uint32_t frames, ParameterCh
     plugin.outputParameters.clearQueue();
     clearAudio(plugin.data, false);
     uint32_t noteOffset = 0, parameterOffset = 0;
-    for (uint32_t i = 0; i < notes; ++i) if (!event(input, plugin.events, frames, noteOffset)) return false;
-    for (uint32_t i = 0; i < parameters; ++i) if (!parameter(input, plugin, changes, frames, parameterOffset)) return false;
+    for (uint32_t i = 0; i < notes; ++i)
+        if (!event(input, plugin.events, frames, noteOffset)) return false;
+    for (uint32_t i = 0; i < parameters; ++i)
+        if (!parameter(input, plugin, changes, frames, parameterOffset)) return false;
     for (uint32_t frame = 0; frame < frames; ++frame)
         for (int32 bus = 0; bus < plugin.data.numInputs; ++bus)
             for (int32 channel = 0; channel < plugin.data.inputs[bus].numChannels; ++channel)
@@ -104,7 +115,7 @@ bool processBlock(std::istream& input, std::ostream& output, Plugin& plugin, uin
     plugin.error = "Stream output closed";
     return bool(output);
 }
-}
+} // namespace
 
 // A stream-session retains a plug-in instance across transactions; inspect its controller once.
 bool Plugin::acceptsParameter(ParamID id) {
@@ -132,7 +143,8 @@ bool Plugin::stream(std::istream& input, std::ostream& output, uint64_t frameLim
 #endif
     error = "Streaming currently requires one output bus and at most one input/event bus";
     if (data.numInputs > 1 || data.numOutputs != 1 || data.outputs[0].numChannels < 1 ||
-        component->getBusCount(kEvent, kInput) > 1) return false;
+        component->getBusCount(kEvent, kInput) > 1)
+        return false;
     written(output, 0x3156534f); // OSV1, followed by channel counts and MIDI support.
     written(output, channels(data.numInputs, data.inputs));
     written(output, channels(data.numOutputs, data.outputs));
@@ -143,7 +155,8 @@ bool Plugin::stream(std::istream& input, std::ostream& output, uint64_t frameLim
         uint32_t frames = 0;
         error = "Invalid or truncated stream frame count";
         if (!word(input, frames) || frames == 0 || frames > uint32_t(blockSize) ||
-            context.projectTimeSamples > std::numeric_limits<int64>::max() - frames) return false;
+            context.projectTimeSamples > std::numeric_limits<int64>::max() - frames)
+            return false;
         error = "Text stream exceeds its bounded frame budget";
         if (frameLimit && uint64_t(context.projectTimeSamples - firstFrame) + frames > frameLimit) return false;
         if (!processBlock(input, output, *this, frames)) return false;
@@ -152,4 +165,4 @@ bool Plugin::stream(std::istream& input, std::ostream& output, uint64_t frameLim
     error = "Stream input failed";
     return !input.bad();
 }
-}
+} // namespace osprey::vst

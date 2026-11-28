@@ -24,7 +24,10 @@ int failure(const std::string& message) {
 #if defined(__APPLE__)
 constexpr uint32_t MaxFrames = 8192;
 constexpr uint32_t Rate = 48000;
-struct Wave { uint32_t channels = 0, frames = 0; std::vector<float> samples; };
+struct Wave {
+    uint32_t channels = 0, frames = 0;
+    std::vector<float> samples;
+};
 
 uint32_t word(const std::string& bytes, size_t at, size_t count = 4) {
     uint32_t result = 0;
@@ -36,11 +39,14 @@ bool wave(const std::string& bytes, Wave& result) {
     if (bytes.size() < 58 || bytes.compare(0, 4, "RIFF") || bytes.compare(8, 8, "WAVEfmt ") ||
         word(bytes, 4) != bytes.size() - 8 || word(bytes, 16) != 18 || word(bytes, 20, 2) != 3 ||
         word(bytes, 24) != Rate || word(bytes, 34, 2) != 32 || word(bytes, 36, 2) != 0 ||
-        bytes.compare(38, 4, "fact") || word(bytes, 42) != 4 || bytes.compare(50, 4, "data")) return false;
-    result.channels = word(bytes, 22, 2); result.frames = word(bytes, 46);
+        bytes.compare(38, 4, "fact") || word(bytes, 42) != 4 || bytes.compare(50, 4, "data"))
+        return false;
+    result.channels = word(bytes, 22, 2);
+    result.frames = word(bytes, 46);
     if (result.channels < 1 || result.channels > 2 || result.frames < 1 || result.frames > MaxFrames ||
         word(bytes, 28) != Rate * result.channels * 4 || word(bytes, 32, 2) != result.channels * 4 ||
-        word(bytes, 54) != result.frames * result.channels * 4 || bytes.size() != 58 + word(bytes, 54)) return false;
+        word(bytes, 54) != result.frames * result.channels * 4 || bytes.size() != 58 + word(bytes, 54))
+        return false;
     result.samples.resize(result.frames * result.channels);
     for (size_t i = 0; i < result.samples.size(); ++i) {
         const auto bits = word(bytes, 58 + i * 4);
@@ -73,7 +79,8 @@ class Device {
         auto& device = *static_cast<Device*>(context);
         auto& slot = *static_cast<Slot*>(buffer->mUserData);
         const auto count = device.returned.fetch_add(slot.frames, std::memory_order_release) + slot.frames;
-        if (!device.draining.load(std::memory_order_relaxed) && count == device.accepted.load(std::memory_order_acquire))
+        if (!device.draining.load(std::memory_order_relaxed) &&
+            count == device.accepted.load(std::memory_order_acquire))
             device.emptyCallbacks.fetch_add(1, std::memory_order_relaxed);
         slot.available.store(true, std::memory_order_release);
     }
@@ -95,16 +102,23 @@ class Device {
     bool open(uint32_t width) {
         if (queue) return channels == width || rejected("Output channel layout changed during playback");
         if (!returned.is_lock_free() || !accepted.is_lock_free() || !emptyCallbacks.is_lock_free() ||
-            !draining.is_lock_free() || !slots[0].available.is_lock_free()) return rejected("Audio atomics are not lock-free");
+            !draining.is_lock_free() || !slots[0].available.is_lock_free())
+            return rejected("Audio atomics are not lock-free");
         channels = width;
         AudioStreamBasicDescription format{};
-        format.mSampleRate = Rate; format.mFormatID = kAudioFormatLinearPCM;
+        format.mSampleRate = Rate;
+        format.mFormatID = kAudioFormatLinearPCM;
         format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
         format.mBytesPerPacket = format.mBytesPerFrame = channels * sizeof(float);
-        format.mFramesPerPacket = 1; format.mChannelsPerFrame = channels; format.mBitsPerChannel = 32;
-        if (!checked(AudioQueueNewOutput(&format, consumed, this, nullptr, nullptr, 0, &queue), "AudioQueueNewOutput")) return false;
+        format.mFramesPerPacket = 1;
+        format.mChannelsPerFrame = channels;
+        format.mBitsPerChannel = 32;
+        if (!checked(AudioQueueNewOutput(&format, consumed, this, nullptr, nullptr, 0, &queue), "AudioQueueNewOutput"))
+            return false;
         for (auto& slot : slots) {
-            if (!checked(AudioQueueAllocateBuffer(queue, MaxFrames * 2 * sizeof(float), &slot.buffer), "AudioQueueAllocateBuffer")) return false;
+            if (!checked(AudioQueueAllocateBuffer(queue, MaxFrames * 2 * sizeof(float), &slot.buffer),
+                         "AudioQueueAllocateBuffer"))
+                return false;
             slot.buffer->mUserData = &slot;
         }
         return true;
@@ -129,14 +143,22 @@ class Device {
         return nullptr;
     }
 
-    bool rejected(const char* message) { error = message; return false; }
-public:
-    ~Device() { draining.store(true); if (queue) AudioQueueDispose(queue, true); }
+    bool rejected(const char* message) {
+        error = message;
+        return false;
+    }
+
+  public:
+    ~Device() {
+        draining.store(true);
+        if (queue) AudioQueueDispose(queue, true);
+    }
     const std::string& problem() const { return error; }
 
     bool push(const Wave& block) {
         if (finished) return rejected("The audio stream has already drained");
-        if (accepted.load() > std::numeric_limits<uint64_t>::max() - block.frames) return rejected("Audio sample clock exhausted");
+        if (accepted.load() > std::numeric_limits<uint64_t>::max() - block.frames)
+            return rejected("Audio sample clock exhausted");
         if (!open(block.channels)) return false;
         auto* slot = available(block.frames);
         if (!slot) return false;
@@ -149,7 +171,8 @@ public:
         if (running) return true;
         // Two producer blocks prepare the device before its first callback.
         unsigned queued = 0;
-        for (auto& held : slots) if (!held.available.load(std::memory_order_acquire)) ++queued;
+        for (auto& held : slots)
+            if (!held.available.load(std::memory_order_acquire)) ++queued;
         return queued < 2 || start();
     }
 
@@ -159,12 +182,15 @@ public:
         if (!start()) return false;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (returned.load(std::memory_order_acquire) != accepted.load(std::memory_order_acquire)) {
-            if (std::chrono::steady_clock::now() >= deadline) return rejected("Audio output did not drain within three seconds");
+            if (std::chrono::steady_clock::now() >= deadline)
+                return rejected("Audio output did not drain within three seconds");
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         if (!checked(AudioQueueStop(queue, true), "AudioQueueStop")) return false;
-        running = false; finished = true;
-        std::cerr << "{\"event\":\"audio.drained\",\"frames\":" << returned.load() << ",\"emptyCallbacks\":" << emptyCallbacks.load() << "}\n";
+        running = false;
+        finished = true;
+        std::cerr << "{\"event\":\"audio.drained\",\"frames\":" << returned.load()
+                  << ",\"emptyCallbacks\":" << emptyCallbacks.load() << "}\n";
         return true;
     }
 
@@ -172,19 +198,20 @@ public:
         const auto sent = accepted.load(std::memory_order_acquire);
         const auto empty = emptyCallbacks.load(std::memory_order_acquire);
         if (empty > reportedEmpty) {
-            std::cerr << "{\"event\":\"audio.queue_empty\",\"count\":" << empty
-                      << ",\"acceptedFrames\":" << sent << "}\n";
+            std::cerr << "{\"event\":\"audio.queue_empty\",\"count\":" << empty << ",\"acceptedFrames\":" << sent
+                      << "}\n";
             reportedEmpty = empty;
             lastEmptyFrame = sent;
         }
         const auto done = returned.load(std::memory_order_acquire);
         std::cout << "{\"status\":0,\"acceptedFrames\":" << sent << ",\"returnedFrames\":" << done
                   << ",\"queuedFrames\":" << sent - done << ",\"channels\":" << channels
-                  << ",\"emptyCallbacks\":" << empty << ",\"running\":" << (running ? "true" : "false") << "}\n" << std::flush;
+                  << ",\"emptyCallbacks\":" << empty << ",\"running\":" << (running ? "true" : "false") << "}\n"
+                  << std::flush;
     }
 };
 #endif
-}
+} // namespace
 
 int audioDevice() {
 #if defined(__APPLE__)
@@ -196,10 +223,13 @@ int audioDevice() {
             const std::string request(command.data());
             if (request == "!drain") {
                 if (!device.drain()) return failure(device.problem());
-            } else if (request != "!status") return failure("Unknown audio command");
+            } else if (request != "!status")
+                return failure("Unknown audio command");
         } else {
-            std::string bytes; Wave block;
-            if (!readHex(std::cin, bytes, true) || !wave(bytes, block)) return failure("Invalid bounded 48 kHz float32 WAV block; output must be within -1..1");
+            std::string bytes;
+            Wave block;
+            if (!readHex(std::cin, bytes, true) || !wave(bytes, block))
+                return failure("Invalid bounded 48 kHz float32 WAV block; output must be within -1..1");
             if (!device.push(block)) return failure(device.problem());
         }
         device.receipt();

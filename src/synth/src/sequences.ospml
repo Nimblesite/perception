@@ -136,4 +136,3 @@ module Sequences
     *)
     export flattened<T> : List<List<T>> -> List<T>
     flattened parts = foldList (parts, [], \(all, part) => joined (all, part))
-

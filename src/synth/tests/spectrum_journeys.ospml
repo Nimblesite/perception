@@ -54,7 +54,7 @@ inTuneWithin (label, samples, near, span, cents) = within ("${label} pitch (cent
 
 oscStep (config, run) =
     out = Oscillators::next (config, run.held)
-    { held = out.next, samples = listAppend run.samples out.sample }
+    appended (run, out.next, out.sample)
 
 oscillated (waveform, frequency, width, count) =
     config = synth::OscillatorConfig(sampleRate = probeRate, frequency = frequency, pulseWidth = width, waveform = waveform)
@@ -67,10 +67,13 @@ fourier (shape, k) = match shape.wave
     synth::Triangle => ProbeMath::triangleHarmonic k
     synth::Sine => ProbeMath::sineHarmonic k
 
-sawShape () = { name = "saw", wave = synth::Saw, width = 0.5, exact = true }
-squareShape () = { name = "square", wave = synth::Pulse, width = 0.5, exact = true }
+// One oscillator shape: its pulse width, and whether its partials are known exactly or only bounded.
+shape (name, wave, width, exact) = { name = name, wave = wave, width = width, exact = exact }
 
-shapes () = [{ name = "sine", wave = synth::Sine, width = 0.5, exact = true }, sawShape (), squareShape (), { name = "pulse 1/4", wave = synth::Pulse, width = 0.25, exact = true }, { name = "pulse 1/10", wave = synth::Pulse, width = 0.1, exact = false }, { name = "triangle", wave = synth::Triangle, width = 0.5, exact = true }]
+sawShape () = shape ("saw", synth::Saw, 0.5, true)
+squareShape () = shape ("square", synth::Pulse, 0.5, true)
+
+shapes () = [shape ("sine", synth::Sine, 0.5, true), sawShape (), squareShape (), shape ("pulse 1/4", synth::Pulse, 0.25, true), shape ("pulse 1/10", synth::Pulse, 0.1, false), shape ("triangle", synth::Triangle, 0.5, true)]
 
 // Each partial holds its Fourier amplitude, never louder and at most polyBLEP's roll-off quieter; a partial the
 // series lacks is absent to the probe's floor.
@@ -109,9 +112,8 @@ responseHeld r = match Filters::configure (synth::FilterConfig(sampleRate = prob
         run = foldList (toList (range (0, 9600)), { held = Filters::initial, low = [], band = [], high = [] }, \(held, n) => filterStep (c, held, r.frequency, n))
         w = ProbeMath::warpedRatio (r.frequency, r.cutoff, probeRate)
         label = "SVF ${r.cutoff} Hz Q ${r.q} at ${r.frequency} Hz"
-        within ("${label} low", decibelsAt (Sequences::drop (run.low, 4800), r.frequency), ProbeMath::decibels (ProbeMath::lowGain (w, r.q)), 0.001)
-        within ("${label} band", decibelsAt (Sequences::drop (run.band, 4800), r.frequency), ProbeMath::decibels (ProbeMath::bandGain (w, r.q)), 0.001)
-        within ("${label} high", decibelsAt (Sequences::drop (run.high, 4800), r.frequency), ProbeMath::decibels (ProbeMath::highGain (w, r.q)), 0.001)
+        forEachList ([{ name = "low", output = run.low, gain = ProbeMath::lowGain }, { name = "band", output = run.band, gain = ProbeMath::bandGain }, { name = "high", output = run.high, gain = ProbeMath::highGain }], \band =>
+            within ("${label} ${band.name}", decibelsAt (Sequences::drop (band.output, 4800), r.frequency), ProbeMath::decibels (band.gain (w, r.q)), 0.001))
 
 responses () = foldList ([250.0, 1000.0, 5000.0, 15000.0], [], \(all, cutoff) => foldList ([0.5, 0.707, 2.0, 5.0], all, \(rows, q) => foldList ([50.0, 250.0, 1000.0, 4000.0, 12000.0, 20000.0], rows, \(acc, f) => listAppend acc { cutoff = cutoff, q = q, frequency = f })))
 
@@ -146,11 +148,12 @@ sidebandsHeld shift =
     within ("SSB ${shift} Hz shifted", decibelsAt (s, 1000.0 + shift), 0.0, 0.01)
     below ("SSB ${shift} Hz image", decibelsAt (s, 1000.0 - shift), -40.0)
     below ("SSB ${shift} Hz carrier", decibelsAt (s, 1000.0), -100.0)
-    r = processed (setTo (Components::shifter (1, shift), [{ key = "ring", value = 1.0 }]))
-    forEachList ([1000.0 + shift, 1000.0 - shift], \f => within ("ring ${shift} Hz sideband ${f}", decibelsAt (r, f), ProbeMath::decibels 0.5, 0.01))
-    below ("ring ${shift} Hz carrier", decibelsAt (r, 1000.0), -100.0)
-    m = processed (setTo (Components::shifter (1, shift), [{ key = "mix", value = 0.5 }]))
-    forEachList ([1000.0, 1000.0 + shift], \f => within ("half-mixed SSB ${shift} Hz at ${f}", decibelsAt (m, f), ProbeMath::decibels 0.5, 0.01))
+    // Ring modulation splits the carrier into both sidebands and the carrier itself is gone; a half mix keeps the
+    // carrier and adds one sideband. Each kept band sits at half amplitude.
+    forEachList ([{ setting = "ring", value = 1.0, name = "ring", word = "sideband", kept = [1000.0 + shift, 1000.0 - shift], gone = [1000.0] }, { setting = "mix", value = 0.5, name = "half-mixed SSB", word = "at", kept = [1000.0, 1000.0 + shift], gone = [] }], \c =>
+        r = processed (setTo (Components::shifter (1, shift), [{ key = c.setting, value = c.value }]))
+        forEachList (c.kept, \f => within ("${c.name} ${shift} Hz ${c.word} ${f}", decibelsAt (r, f), ProbeMath::decibels 0.5, 0.01))
+        forEachList (c.gone, \f => below ("${c.name} ${shift} Hz carrier", decibelsAt (r, f), -100.0)))
 
 // An odd curve makes odd harmonics only; bias breaks the symmetry and brings the even ones.
 shapedHeld c =

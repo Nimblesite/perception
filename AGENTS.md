@@ -9,6 +9,8 @@
 - 📜 Logging = an effect via the standard Osprey package. ❌ logs in the repo root
 
 ## 🐦 Osprey
+- 🚫 C++ banned: new code is Osprey only. ❌ write or grow C/C++ (the legacy VST3 worker included)
+- ⏱️ Live playback must get faster (device cadence, queue latency) [DAW-TRANSPORT-LIVE-LATENCY], but not now: deferred. ❌ tune it unasked
 - 🛠️ Compiler: use what's installed. 1️⃣ the VS Code extension's bundled one (`~/.vscode/extensions/nimblesite.osprey-<version>-<platform>/bin/<platform>/osprey`), 2️⃣ `brew install nimblesite/tap/osprey` (macOS/Linux) or `scoop install osprey` (Windows, [bucket](https://github.com/Nimblesite/scoop-bucket)). ❌ build ospreylang just to run a program. [Install](https://www.ospreylang.dev/docs/installation/)
 - 📖 Learn it: [docs](https://www.ospreylang.dev/docs/) · [first app](https://www.ospreylang.dev/docs/my-first-app/) · [types](https://www.ospreylang.dev/docs/types/) · [functions](https://www.ospreylang.dev/docs/functions/) · [operators](https://www.ospreylang.dev/docs/operators/) · [keywords](https://www.ospreylang.dev/docs/keywords/) · [stdlib](https://www.ospreylang.dev/docs/stdlib/)
 - ⚡ Effects = how Osprey does I/O and testing: [effects](https://www.ospreylang.dev/docs/effects/)
@@ -27,6 +29,7 @@
 - 1️⃣ Memory safety + security first. 0️⃣ tolerance. Attack first
 - 🛑 Osprey never panics, aborts or exits: every failure is `Result` or a handled effect. ❌ fake zero/empty values
 - 🟥 Red = fail: every tracked program compiles
+- 🧹 Run `make lint` routinely: every project checked with `--warnings-as-errors`. ⚠️ Any warning fails CI [CI-LINT]. Fix it; ❌ silence it (`--no-warnings`, `[lints]` downgrades)
 
 ## 🧪 Tests
 - ✅ E2E use-case tests: many inputs, many interactions, many assertions. Unit tests only when isolation is needed

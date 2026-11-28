@@ -438,4 +438,3 @@ module Patches
     ```
     *)
     export phaseNetworkMacros () = [Macro(name = "Brightness", targets = [MacroTarget(node = 1, key = "breakpoint", minimum = 0.5, maximum = 0.05, exponent = 1.0), MacroTarget(node = 2, key = "drive", minimum = 1.0, maximum = 4.0, exponent = 2.0)]), Macro(name = "Growl", targets = [MacroTarget(node = 1, key = "index", minimum = 0.0, maximum = 2.0, exponent = 1.5), MacroTarget(node = 1, key = "index2", minimum = 0.0, maximum = 1.5, exponent = 1.5)]), Macro(name = "Motion", targets = [MacroTarget(node = 1, key = "depth", minimum = 0.0, maximum = 0.6, exponent = 2.0)])]
-

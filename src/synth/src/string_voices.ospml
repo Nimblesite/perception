@@ -161,4 +161,3 @@ module StringVoices
     ```
     *)
     export next pool = foldList (pool.voices, Success(value = StringPoolSample(sample = 0.0, next = pool(voices = []))), \(outcome, voice) => voiced (pool, outcome, voice))
-

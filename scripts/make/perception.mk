@@ -4,7 +4,7 @@
 include Makefile
 DAW_MAKE = $(MAKE) -f scripts/make/perception.mk
 
-.PHONY: compiler synth-proofs perception-ci canary perception-test synth synth-headless synth-vst daw-models daw-gpui studio daw-render daw-play \
+.PHONY: compiler synth-proofs perception-ci perception-lint canary perception-test synth synth-headless synth-vst daw-models daw-gpui studio daw-render daw-play \
 	daw-icon daw-events-headless daw-playback-rate daw-profile daw-video perception-website
 
 ## canary: Perception's major end-to-end checks, which ospreylang runs on every CI build
@@ -17,15 +17,25 @@ canary: $(if $(filter Darwin,$(UNAME_S)),_runtime_macos_arc)
 	$(BIN) test src/synth/tests$(if $(PERCEPTION_COVERAGE), --coverage-json $(basename $(PERCEPTION_COVERAGE))-synth.json)
 	$(BIN) test src/studio/test$(if $(PERCEPTION_COVERAGE), --coverage-json $(PERCEPTION_COVERAGE))
 	mkdir -p target/daw
-	$(BIN) build src/studio/render --memory=arc --quiet --no-warnings -o target/daw/daw
+	$(BIN) build src/studio/render --memory=arc --quiet -o target/daw/daw
 	$(if $(filter Darwin,$(UNAME_S)),OSPREY_BIN="$(CURDIR)/$(BIN)" bash src/studio/run.sh --smoke)
+
+## perception-lint: Every Perception project checked with warnings as errors, and every Osprey source formatted: one
+##                  warning, one unformatted file or one target sharing an ospreylang target's name (this file
+##                  includes ospreylang's Makefile, where make only warns and silently swaps the recipe) fails the
+##                  build [CI-LINT]. scripts/lint.sh checks everything else.
+LINT_PROJECTS := src/synth src/synth/tests src/studio src/studio/render src/studio/test
+perception-lint:
+	@! $(DAW_MAKE) -n -q compiler 2>&1 >/dev/null | grep "warning: overriding" || { echo "a Perception target shares an ospreylang target's name: rename it [CI-LINT]"; false; }
+	$(foreach project,$(LINT_PROJECTS),nice $(BIN) --check --warnings-as-errors $(project) &&) true
+	$(BIN) fmt --check src/synth src/studio
 
 ## compiler: The C runtime archives and the release osprey binary this product builds with.
 compiler: _runtime
 	$(COMPILER_BUILD)
 
 ## perception-ci: Every Perception check this host can run: the canary, then the website build.
-perception-ci: compiler canary perception-website
+perception-ci: compiler perception-lint canary perception-website
 
 ## perception-test: Perception Studio, driven by accessible label, with no host. [UI-MACHINE-TEST]
 perception-test:
@@ -42,7 +52,7 @@ daw-models:
 	node scripts/make/osprey-schema.mjs "$(TYPEDIAGRAM_DIST)" src/studio/daw.td src/studio/src/project_codec.ospml daw Arrangement
 
 ## synth-vst: Verify isolated VST3 scanning and real instrument/effect processing headlessly.
-synth-vst: _synth_vst_test
+synth-vst: _vst_worker_test
 
 ## synth: Add, drag and connect module nodes, then close/reopen the keyboard in a native window.
 synth:
@@ -52,14 +62,18 @@ synth:
 synth-headless:
 	$(DAW_MAKE) _studio_ui_test GPUI_WINDOW=--headless
 
-## _synth_vst_build: Build Perception Modular from the pinned official SDK.
-.PHONY: _synth_vst_build _synth_vst_test
-_synth_vst_build:
+## _vst_worker_build: Build Perception Modular from the pinned official SDK.
+.PHONY: _vst_worker_build _vst_worker_test _vst_worker_live_latency
+_vst_worker_build:
 	python3 src/toolchain/hosts/synth_vst/build.py
 
-## _synth_vst_test: Scan and process real SDK instruments/effects without a window or audio device.
-_synth_vst_test:
+## _vst_worker_test: Scan and process real SDK instruments/effects without a window or audio device.
+_vst_worker_test:
 	python3 src/toolchain/hosts/synth_vst/build.py --test
+
+## _vst_worker_live_latency: The 20 ms live-latency journey alone; deferred work, so not in CI [DAW-TRANSPORT-LIVE-LATENCY].
+_vst_worker_live_latency:
+	python3 src/toolchain/hosts/synth_vst/build.py --live-latency
 
 ## synth-proofs: [SYNTH-DSP-PROOFS] Every Synthesis theorem, then every production FFT, spectral-frame and
 ##               waveshaper theorem derived from src/synth and src/studio, replays in the Osprey kernel built

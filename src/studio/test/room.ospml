@@ -14,6 +14,9 @@ canvasInput10 = "Canvas input 1:0"
 // The folder every suite output goes under: the repository's `target/daw-tests`, whichever folder the suite runs from.
 outputFolder () = signalflow::App::fromRepository "target/daw-tests"
 
+// The suite's output folder, which must exist.
+outputMade () = succeeds (makeDir (outputFolder ()), \_ => expect (true, true))
+
 // The folder each journey writes into: that folder first, then its own named room.
 madeRoom name =
     _root = makeDir (outputFolder ())
@@ -65,8 +68,7 @@ editorUiJourney () =
             _ => expect (false, true))
     sameHeld (dragged, canvasSelected, \held => held.revision)
     released = Drive::pointer (dragged, 720.0, 300.0, false)
-    hovered = Drive::pointer (released, 600.0, 400.0, false)
-    still = portIn (hovered, canvasInput10)
+    still = portIn (Drive::pointer (released, 600.0, 400.0, false), canvasInput10)
     expect (structuralEquals ([still.accessLeft, still.accessTop], [movedPort.accessLeft, movedPort.accessTop]), true)
     disconnected = cutCable (released, "Cable 0:0 to 1:0")
     rearmed = Drive::pointer (disconnected, 488.5, 169.5, true)
@@ -98,7 +100,7 @@ editorUiJourney () =
     selected = inspectorSelected (invalid, 1)
     removed = deleteNode (selected, 1)
     nodesOf (removed, 2)
-    expect (uitest::Views::letters (removed.drivenSeen, "Gain 1"), false)
+    unlettered (removed, "Gain 1")
     cablesOf (removed, 0)
 
 descriptorFixture = "{\"id\":\"0CDBB66985D548A9BFD8371909D24BB3\",\"name\":\"ADelay\",\"inputs\":2,\"outputs\":2,\"notes\":false,\"parameters\":[{\"id\":100,\"name\":\"Delay\",\"initial\":1.0,\"automatable\":true}]}"
@@ -117,7 +119,7 @@ pluginUiJourney () =
     home = madeRoom "vst-home"
     _prefs = makeDir "${home}/.perception-studio"
     _initial = writeFile "${home}/.perception-studio/vst3-folder" "/plugins"
-    launch = Drive::launchedAt (Drive::idle (synth::EditorApp::program (), synth::EditorState::initial ()), "macos", ["--empty", "--vst-worker", "/worker/osprey-vst-worker"], home)
+    launch = editorLaunchedIn (["--empty", "--vst-worker", "/worker/osprey-vst-worker"], home)
     opened = Drive::press (launch, patchControls)
     showsIn (opened, "Scan VST3", false)
     showsIn (opened, "VST3 folder", false)
@@ -162,7 +164,7 @@ pluginUiJourney () =
     cablesOf (controlled, 5)
     unbound = cutCable (controlled, "Cable 5:0 to 0:1")
     cablesOf (unbound, 4)
-    expect (structuralEquals ((Drive::holding unbound).graph.cables, (Drive::holding finished).graph.cables), true)
+    samePart (unbound, finished, \held => held.graph.cables)
     restoresParameter ((Drive::holding unbound).graph)
     wrongSource = studioTap (controlled, "Canvas output 2:0")
     refusedModulation = inspectorAction (wrongSource, 0, modulateDelay)
@@ -205,12 +207,7 @@ hostWireJourney () =
         expect (contains hex "6661637404000000020000006461746110000000", true))
 
 // [STUDIO-ROUTING-MIDI] MIDI sources and stereo sinks are genuine menu-created graph components.
-midiMenuJourney () =
-    opened = openedEditor ["--empty"]
-    notes = component (opened, "midi-note")
-    nodesOf (notes, 1)
-    selected = inspectorSelected (notes, 0)
-    forEachList (["Pitch", "Velocity"], \text => reads (dialOf (selected, text), \dial => expect (dial.accessMax > dial.accessMin, true)))
+midiMenuJourney () = inspected ("midi-note", ["Pitch", "Velocity"], \(notes, _selected) =>
     offeredIn (notes, "Canvas output 0:0", true)
     output = component (notes, stereoOutputText)
     nodesOf (output, 2)
@@ -218,11 +215,14 @@ midiMenuJourney () =
     mentions (incompatible, "different rates")
     gain = chained (output, ["lfo", "modulated-gain"])
     nodesOf (gain, 4)
-    reads (dialOf (inspectorSelected (gain, 2), "Frequency"), \dial => expect (dial.accessMax > dial.accessMin, true))
+    dialRanged (inspectorSelected (gain, 2), "Frequency")
     modulated = linkedCables (gain, 2, 3, 1, 1)
     _ = linkedCables (modulated, 2, 1, 0, 1)
     tuned = choseAt (output, 0, "Pitch", "72")
-    unchosenAt (tuned, 0, "Velocity", "1.1")
+    unchosenAt (tuned, 0, "Velocity", "1.1"))
+
+// The dial of the parameter `label` on the driven editor's Patch Controls scene, with a real range.
+dialRanged (d, label) = reads (dialOf (d, label), \dial => expect (dial.accessMax > dial.accessMin, true))
 
 // [SYNTH-HOST-MIDI] Independent event expectations exercise exact block-boundary ownership.
 midiTimingJourney () =
@@ -278,12 +278,12 @@ modulationJourney () =
             reads (listGet output.clipSamples index, \value => near (value, listGet expected index ?: 99.0)))
         moving = edited (editor, 2, "frequency", "20")
         succeeds (clipOutput moving.graph, \modulated => differs (modulated.clipSamples, output.clipSamples)))
-    errs (clipOutput (synth::EditorState::tapped (editor, synth::Disconnect(identity = 3, inlet = 1))).graph)
+    errs (clipOutput ((tapped (editor, synth::Disconnect(identity = 3, inlet = 1))).graph))
     refuses (editor.graph, [deadClip (2, 8, -0.1)], 8)
 
 // [SYNTH-HOST-MODULATION] Graph cables become exact normalized native automation points.
 projectPluginJourney editor =
-    song = arrangedSong (120.0, 48000, [arrangedBell ("Hosted pair", 1.0, [arrangedNote (0.0, 1.0)])])
+    song = timeline [arrangedBell ("Hosted pair", 1.0, [arrangedNote (0.0, 1.0)])]
     succeeds (daw::PatchRecords::savedAt (song, 0, editor.graph, editor.positions), \saved => succeeds (reopened saved, \opened =>
         succeeds (daw::TrackPatches::picked (opened, 0), \graph =>
             expect (structuralEquals (graph, editor.graph), true)
@@ -305,7 +305,7 @@ hostedModulationJourney graph =
         reads (listGet block.parameters 1, \second =>
             expect (second.offset, 128)
             expect (second.value > 0.5 && second.value < 1.0, true)))
-    valid (modulatedBy (graph, "vst:100"), \same => expect (structuralEquals (same, graph), true))
+    valid (modulatedBy (graph, "vst:100"), \same => alike (same, graph))
     refusesGraph (modulatedBy (graph, "vst:unknown"))
     refuses (graph, [deadClip (5, 256, 1.1)], 256)
 
@@ -314,7 +314,13 @@ hostedModulationJourney graph =
 clickAt (driven, x, y) = Drive::pointer (Drive::pointer (driven, x, y, true), x, y, false)
 
 // The Perception Studio editor, freshly launched on macOS with these arguments.
-editorLaunched args = Drive::launched (Drive::idle (synth::EditorApp::program (), synth::EditorState::initial ()), "macos", args)
+editorLaunched args = Drive::launched (idleEditor (), "macos", args)
+
+// The Perception Studio editor launched on macOS with these arguments, from `home`.
+editorLaunchedIn (args, home) = Drive::launchedAt (idleEditor (), "macos", args, home)
+
+// The editor idle, before any launch.
+idleEditor () = Drive::idle (synth::EditorApp::program (), synth::EditorState::initial ())
 
 // The editor's canvas, opened by its menu button.
 openedEditor args = Drive::press (editorLaunched args, patchControls)
@@ -345,6 +351,15 @@ heldIs (driven, read, want) = expect (read (Drive::holding driven), want)
 
 // The same field of two driven states, which must agree.
 sameHeld (one, other, read) = expect (read (Drive::holding one) == read (Drive::holding other), true)
+
+// The same part of two driven graphs, which must agree structurally.
+samePart (one, other, read) = expect (structuralEquals (read (Drive::holding one), read (Drive::holding other)), true)
+
+// The driven editor is on `page`.
+pageIs (d, page) = heldIs (d, \held => held.page, page)
+
+// No module's details are shown in the driven editor.
+noDetails (d) = heldIs (d, \held => held.detailsShown, false)
 
 // The driven state's message, which must mention `text`.
 mentions (driven, text) = expect (contains (Drive::holding driven).message text, true)
@@ -406,8 +421,10 @@ noteOn (identity, offset, velocity) = synth::HostNote(kind = 1, offset = offset,
 // The source's notes of one window, which must be exactly `want`.
 windowed (source, start, span, want) = succeeds (synth::MidiClips::window (source, start, span), \notes => expect (structuralEquals (notes, want), true))
 
-// Two structures, which must differ.
+// Two structures, which must differ, and two that must agree.
 differs (one, other) = expect (structuralEquals (one, other), false)
+
+alike (one, other) = expect (structuralEquals (one, other), true)
 
 // A malformed packet the host must refuse.
 refusedPacket bad = errs (synth::HostPackets::packet (1, bad))
@@ -488,20 +505,21 @@ tapJourney () =
             succeeds (trackBuses (opened, daw::Arrangements::empty, track, 128), \mixed =>
                 expect (length mixed.groups, 1)
                 reads (listGet mixed.groups 0, \group =>
-                    expect (group.name, "pads")
-                    expect (length group.left, 128)
+                    padsGroup (group, 128)
                     succeeds (trackPart (song, voice, 128), \dry =>
                         forEachList ([9, 31, 83, 120], \i =>
                             reference = listGet dry i ?: 0.0
                             expect (abs reference > 0.000001, true)
-                            sampleAt (group.left, i, reference * 1.25 * daw::ArrangeMath::panLeft 0.0)
-                            sampleAt (group.right, i, reference * 1.25 * daw::ArrangeMath::panRight 0.0)
+                            centred (group, i, reference * 1.25)
                             sampleAt (mixed.left, i, 0.0))))
                 encoded (opened, \saved => expect (contains saved "\"sendId\":2", true))))))
 
 // [DAW-RENDER-PLAY] The project plays as one loop over time: each block advances every track, its bus
 // (EQ and kick-keyed compressor) and its send together into Master.
 playedNote (start, length) = daw::Note(pitch = 60, start = start, length = length, velocity = 0.9)
+
+playBlock (song, frames, check) = succeeds (daw::Playback::start song, \playing =>
+    succeeds (daw::Playback::step (song, playing, frames), check))
 
 playedKick notes = daw::Track(name = "kick", instrument = daw::DrumInstrument(hit = daw::Hit(sweep = 2.0, noise = 0.3, colour = 0.5, decay = 0.05)), gain = 1.0, pan = -0.4, bus = "", sends = [], positions = [], notes = notes)
 
@@ -512,7 +530,7 @@ playedBus ratio =
 playedSong ratio =
     bell = bellTrack ()
     keys = keysTrack ()
-    tap = daw::AudioSend(sendId = 1, source = 1, outlet = 0, bus = "pads", level = 0.5, enabled = true)
+    tap = audioSend (1, "pads", 0.5)
     pair = daw::OperatorInstrument(tone = daw::Tone(breakpoint = 0.4, feedback = 0.15, attack = 0.01, release = 0.015, bloom = 0.1, detune = -8.0))
     op = bell(name = "pair", instrument = pair, sends = [tap], notes = [playedNote (0.01, 0.03), playedNote (0.02, 0.06), playedNote (0.12, 0.03)])
     tracks = [op, playedKick [playedNote (0.0, 0.05), playedNote (0.1, 0.05), playedNote (0.125, 0.05)], bell(bus = "pads", notes = [playedNote (0.05, 0.1), playedNote (0.2, 0.1)]), keys(pan = 0.3, sends = [tap], notes = [playedNote (0.0, 0.015), playedNote (0.2, 0.015)])]
@@ -542,8 +560,7 @@ sameSide (one, other) =
     forEachList (toList (range (0, length one)), \i => sampleAt (other, i, listGet one i ?: 0.0))
 
 sameMaster (one, other) =
-    sameSide (sideOf (one, false), sideOf (other, false))
-    sameSide (sideOf (one, true), sideOf (other, true))
+    forEachList ([false, true], \right => sameSide (sideOf (one, right), sideOf (other, right)))
 
 loudest side = foldList (side, 0.0, \(high, value) => synth::TableMath::larger (high, abs value))
 
@@ -611,13 +628,13 @@ liveKnobJourney () =
     note = beatNote 0.125
     score = timeline [track(notes = [note])]
     routing = daw::TrackPatches::routing track.instrument
-    muted = retuned (routing, "gain", daw::Setting(key = "gain", value = 0.0, follow = daw::Constant))
+    muted = retuned (routing, "gain", fixed ("gain", 0.0))
     quiet = rerouted (score, track, note, muted)
     succeeds (daw::Playback::start score, \start =>
         succeeds (daw::Playback::step (score, start, 512), \first =>
             audible first.left
-            pitched = retuned (routing, "sine", daw::Setting(key = "frequency", value = 1.0, follow = daw::Pitched))
-            tuned = rerouted (score, track, note, pitched)
+            raised = retuned (routing, "sine", pitched "frequency")
+            tuned = rerouted (score, track, note, raised)
             succeeds (daw::Playback::step (score, first.playing, 128), \reference =>
                 succeeds (daw::Playback::step (tuned, first.playing, 128), \changed =>
                     expect (abs ((listGet reference.left 0 ?: 1.0) - (listGet changed.left 0 ?: -1.0)) < 0.02, true)
@@ -636,31 +653,29 @@ longer (most, lane) = match length lane > most
 
 heldFrames track = foldList (track.sounding, 0, \(most, sound) => foldList (sound.lanes, most, longer))
 
-onlyMasterJourney () = succeeds (daw::Playback::start (playedSong 4.0), \playing =>
-    succeeds (daw::Playback::step (playedSong 4.0, playing, 128), \played =>
-        forEachList (played.playing.tracks, \track => expect (heldFrames track <= 128, true))))
+onlyMasterJourney () = playBlock (playedSong 4.0, 128, \played =>
+    forEachList (played.playing.tracks, \track => expect (heldFrames track <= 128, true)))
 
 // [DAW-MODULAR-LAYOUT] A track carries the project's two channels to Master. A patch that sounds only on its left
 // channel is heard only on Master's left: never folded to one channel and panned onto both sides.
 leftOnlyTrack () =
-    sine = piece (1, "sine", [daw::Setting(key = "frequency", value = 1.0, follow = daw::Pitched)])
-    join = daw::PatchNode(identity = 2, component = "join", size = 2, seed = 0, asset = "", settings = [])
-    freshTrack ("left", daw::PatchInstrument(routing = daw::Routing(nodes = [sine, join, piece (3, "stereoOutput", [])], cables = [cabled (1, 0, 2, 0), cabled (2, 0, 3, 0)], attack = 0.01, release = 0.1)))
+    sine = piece (1, "sine", [pitched "frequency"])
+    join = piece (2, "join", [])
+    chainTrack ("left", [sine, join(size = 2), piece (3, "stereoOutput", [])], 0.1)
 
 stereoTrackJourney () =
     left = leftOnlyTrack ()
     song = timeline [left(notes = [playedNote (0.0, 0.25)])]
-    succeeds (daw::Playback::start song, \playing =>
-        succeeds (daw::Playback::step (song, playing, 4800), \played =>
-            audible played.left
-            expect (loudest played.right, 0.0)))
+    playBlock (song, 4800, \played =>
+        audible played.left
+        expect (loudest played.right, 0.0))
 
 masterPlayJourney () =
     liveKnobJourney ()
     song = playedSong 4.0
     playedIn (song, [6000], \whole =>
-        expect (loudest (sideOf (whole, false)) > 0.01, true)
-        expect (loudest (sideOf (whole, true)) > 0.01, true)
+        audible (sideOf (whole, false))
+        audible (sideOf (whole, true))
         // Any block size plays the same Master: every stage carries its state across the block edge.
         forEachList ([[1000, 1000, 1000, 1000, 1000, 1000], [4097, 1903], [3000, 3000], [1, 2499, 1, 3499], [2500, 2500, 1000]], \sizes =>
             playedIn (song, sizes, \blocks => sameMaster (whole, blocks)))
@@ -675,7 +690,10 @@ masterPlayJourney () =
     failsWith (daw::Playback::start (timeline [bell(bus = "pads")]), "bell: Bus pads is not in the song.")
 
 // The rendered scene the host binds to the editor input `wanted`: the song window's `Surface` or the patch window's `PatchSurface`.
-sceneBound (d, wanted) = ui::Lists::find (d.drivenSeen.renderedScenes, \ordinal => boundTo (d, ordinal, wanted))
+sceneBound (d, wanted) = listGet (sceneOrdinals (d, wanted)) 0
+
+// The rendered scenes the host binds to `wanted`.
+sceneOrdinals (d, wanted) = filterList (d.drivenSeen.renderedScenes, \ordinal => boundTo (d, ordinal, wanted))
 
 boundTo (d, ordinal, wanted) = match listGet d.drivenSurface.surfaceBound ordinal
     Error _ => false
@@ -696,8 +714,7 @@ regionViewed (d, wanted, width, height) = sceneEvent (d, wanted, ui::Hosting::vi
 // The patch's room as each window holds it: the patch window's spare width and height, and how far right the song page starts in the main window.
 patchRoom (d, spareWidth, spareHeight, songShift) =
     editor = Drive::holding d
-    expect (ui::Machines::number (editor.skin, "spareWidth"), spareWidth)
-    expect (ui::Machines::number (editor.skin, "spareHeight"), spareHeight)
+    expect ([ui::Machines::number (editor.skin, "spareWidth"), ui::Machines::number (editor.skin, "spareHeight")], [spareWidth, spareHeight])
     expect (synth::EditorView::rightX (editor, 1234.0), 1234.0 + spareWidth)
     expect (synth::Header::shift editor, songShift)
 
@@ -710,21 +727,20 @@ detachedRoomJourney () =
         session = editorLaunched ["--song", "${place}/song.json"]
         lane = uitest::Semantics::element (session.drivenSeen.renderedAccess, "Track 2")
         opened = clickAt (session, 100.0, lane.accessTop + lane.accessHeight / 2.0)
-        expect ((Drive::holding opened).patchWindowSerial, 1)
-        expect ((Drive::holding opened).patchTrack, 1)
-        expect ((Drive::holding opened).page, synth::TimelinePage)
+        expect ([(Drive::holding opened).patchWindowSerial, (Drive::holding opened).patchTrack], [1, 1])
+        pageIs (opened, synth::TimelinePage)
         patchScene = sceneBound (opened, synth::PatchSurface) ?: -1
         songScene = sceneBound (opened, synth::Surface) ?: -1
         expect (patchScene >= 0 && songScene >= 0 && patchScene != songScene, true)
         // Each resize: the window it measures, its width and height, then the room it leaves.
         scenes = [synth::PatchSurface, synth::Surface, synth::PatchSurface, synth::Surface, synth::Surface, synth::PatchSurface]
         rooms = [
-            [1536.0, 1008.0, 0.0, 180.0, 0.0],
-            [2600.0, 940.0, 0.0, 180.0, 580.0],
-            [1836.0, 1258.0, 300.0, 430.0, 580.0],
-            [1440.0, 940.0, 300.0, 430.0, 0.0],
-            [3000.0, 2000.0, 300.0, 430.0, 0.0],
-            [1536.0, 828.0, 0.0, 0.0, 0.0]
+        [1536.0, 1008.0, 0.0, 180.0, 0.0],
+        [2600.0, 940.0, 0.0, 180.0, 580.0],
+        [1836.0, 1258.0, 300.0, 430.0, 580.0],
+        [1440.0, 940.0, 300.0, 430.0, 0.0],
+        [3000.0, 2000.0, 300.0, 430.0, 0.0],
+        [1536.0, 828.0, 0.0, 0.0, 0.0]
         ]
         expect (length scenes, length rooms)
         panelShowsChosen (foldList (toList (range (0, length rooms)), opened, \(d, i) => resized (d, listGet scenes i ?: synth::Surface, listGet rooms i ?: []))))
@@ -747,7 +763,7 @@ sceneAccess (d, wanted) = match listGet (filterList (synth::EditorView::indices 
     Success index => walkAccess (d, index)
 
 // How many rendered scenes the host binds to `wanted`.
-sceneCount (d, wanted) = length (filterList (d.drivenSeen.renderedScenes, \ordinal => boundTo (d, ordinal, wanted)))
+sceneCount (d, wanted) = length (sceneOrdinals (d, wanted))
 
 // A label only the properties of the Gain module `identity` carry: the skin's canvas inspector or a dial named after the module.
 moduleProperty (label, identity) = startsWith label "Inspector" || startsWith label "Gain ${identity} "
@@ -768,7 +784,7 @@ chooseGain (d, wanted, identity, check) =
         y = card.accessTop + 16.0
         chosen = sceneEvent (sceneEvent (d, wanted, ui::Hosting::pointer, x, y, true, false), wanted, ui::Hosting::pointer, x, y, false, false)
         expect ((Drive::holding chosen).selected, identity)
-        expect ((Drive::holding chosen).detailsShown, false)
+        noDetails chosen
         parametersDocked (chosen, 1, true)
         reads (dialOf (chosen, "Gain"), \dial => expect (dial.accessWidth > 0.0, true))
         expect (mapList (filterList (sceneAccess (chosen, wanted), \a => moduleProperty (a.accessLabel, identity)), \a => a.accessLabel), [])
@@ -777,7 +793,7 @@ chooseGain (d, wanted, identity, check) =
 // [DAW-PAGES-PATCH-WINDOW] A module chosen on the patch window's canvas shows its properties in the patch panel
 // docked in that window, never on the song window.
 panelShowsChosen d = chooseGain (d, synth::PatchSurface, 2, \chosen =>
-    expect ((Drive::holding chosen).page, synth::TimelinePage)
+    pageIs (chosen, synth::TimelinePage)
     song = sceneAccess (chosen, synth::Surface)
     expect (length (filterList (song, \a => startsWith a.accessLabel "Track ")) > 0, true)
     expect (mapList (filterList (song, \a => moduleProperty (a.accessLabel, 2) || startsWith a.accessLabel "Canvas "), \a => a.accessLabel), []))
@@ -786,7 +802,7 @@ panelShowsChosen d = chooseGain (d, synth::PatchSurface, 2, \chosen =>
 // never drawn on the canvas; the panel's Close puts it away and lets go of the module.
 mainPanelJourney () =
     built = patched starterChain
-    expect ((Drive::holding built).page, synth::PatchPage)
+    pageIs (built, synth::PatchPage)
     expect ((Drive::holding built).patchWindowSerial, 0)
     chooseGain (closedPanel built, synth::Surface, 1, \chosen =>
         again = closedPanel chosen
@@ -795,8 +811,8 @@ mainPanelJourney () =
 // The panel's Close pressed: no module is chosen and no details are shown.
 closedPanel d =
     closed = Drive::press (d, "Close")
-    expect ((Drive::holding closed).selected, -1)
-    expect ((Drive::holding closed).detailsShown, false)
+    selectedIs (closed, -1)
+    noDetails closed
     closed
 
 // [DAW-INSPECTOR] [DAW-MENU] View → Patch Controls toggles the patch panel: with a module chosen the panel is
@@ -814,7 +830,7 @@ patchControlsTogglesPanelJourney () =
     expect ((Drive::holding built).selected >= 0, true)
     viewShows (built, addComponent, true)
     hidden = toggledPanel (built, false)
-    expect ((Drive::holding hidden).selected, -1)
+    selectedIs (hidden, -1)
     shown = toggledPanel (hidden, true)
     viewShows (closedPanel shown, addComponent, false)
 
@@ -823,7 +839,7 @@ patchControlsTogglesPanelJourney () =
 // release are over, at every start tried.
 midiSourceTrack () =
     notes = piece (1, "midiNote", [fixed ("pitch", 69.0), fixed ("gateFrames", 900.0)])
-    freshTrack ("midi", daw::PatchInstrument(routing = daw::Routing(nodes = [notes, piece (2, "midiOscillator", []), piece (3, "output", [])], cables = [cabled (1, 0, 2, 0), cabled (2, 0, 3, 0)], attack = 0.01, release = 0.01)))
+    chainTrack ("midi", [notes, piece (2, "midiOscillator", []), piece (3, "output", [])], 0.01)
 
 soundFrom (side, found, i) = match found < 0 && abs (listGet side i ?: 0.0) > 0.0
     true => i
@@ -836,13 +852,14 @@ framesOf (side, from, until) = mapList (toList (range (from, until)), \i => list
 midiSourceJourney () = forEachList ([1200, 2400, 3600], \frame =>
     track = midiSourceTrack ()
     song = timeline [track(notes = [playedNote (toFloat frame / 24000.0, 0.5)])]
-    succeeds (daw::Playback::start song, \playing =>
-        succeeds (daw::Playback::step (song, playing, 7200), \played =>
-            // The sine starts at phase zero on the note's frame, so the first nonzero sample is the next one.
-            expect (firstSound played.left, frame + 1)
-            expect (firstSound played.right, frame + 1)
-            expect (loudest (framesOf (played.left, frame, frame + 900)) > 0.5, true)
-            expect (loudest (framesOf (played.left, frame + 2400, 7200)), 0.0))))
+    playBlock (song, 7200, \played =>
+        // The sine starts at phase zero on the note's frame, so the first nonzero sample is the next one.
+        expect ([firstSound played.left, firstSound played.right], [frame + 1, frame + 1])
+        expect (loudest (framesOf (played.left, frame, frame + 900)) > 0.5, true)
+        expect (loudest (framesOf (played.left, frame + 2400, 7200)), 0.0)))
+
+// The tracks named `name`.
+named (name, tracks) = filterList (tracks, \t => t.name == name)
 
 // [DAW-PATCH-HEARD] The shipped codex song's `sub` patch lost its Mixer→Gain cable: the song still plays, the
 // other tracks are heard and the sub adds nothing to Master; with the cable back the bass is heard.
@@ -854,10 +871,10 @@ subCables t = match t.instrument
     daw::PatchInstrument routing => mapList (routing.cables, \c => [c.source, c.destination])
     _ => []
 
-codexPlayed (song, check) = succeeds (daw::Playback::start song, \playing => succeeds (daw::Playback::step (song, playing, 4800), check))
+codexPlayed (song, check) = playBlock (song, 4800, check)
 
 subHeard song =
-    sub = filterList (song.tracks, \t => t.name == "sub")
+    sub = named ("sub", song.tracks)
     expect (mapList (sub, subCables), [[[0, 2], [0, 1], [1, 2], [3, 4]]])
     without = song(tracks = filterList (song.tracks, \t => t.name != "sub"))
     fixed = song(tracks = mapList (song.tracks, \t => ui::Pick::either (t.name == "sub", rewired t, t)))
@@ -865,7 +882,7 @@ subHeard song =
         audible edited.left
         audible edited.right
         expect (structuralEquals (edited.left, others.left) && structuralEquals (edited.right, others.right), true)
-        expect (structuralEquals (bass.left, others.left), false)
-        expect (structuralEquals (bass.right, others.right), false))))
+        differs (bass.left, others.left)
+        differs (bass.right, others.right))))
 
 codexSubJourney () = succeeds (readFile (signalflow::App::fromRepository "src/studio/tracks/codex-version.json"), \source => succeeds (daw::SongFiles::decode source, subHeard))

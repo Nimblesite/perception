@@ -1,51 +1,14 @@
 import synth::Components
 import synth::Descriptors
-import synth::Envelopes
-import synth::Filters
 import synth::Grains
 import synth::Graphs
 import synth::Observations
-import synth::Oscillators
 import synth::Parameters
 import synth::Performance
 import synth::Renderer
 import synth::Sequences
 import synth::SpectralStreams
 import synth::Timings
-
-validArithmetic = "valid arithmetic"
-
-// [SYNTH-PCM-FLOAT] Independent character search checks every ASCII decoder boundary.
-hexDigitCase code =
-    character = fromCodePoint code ?: "invalid"
-    match indexOf "0123456789ABCDEF" character
-        Error _ => renderRefused (synth::PcmWords::read32 ("0${character}000000", 0))
-        Success digit => match synth::PcmWords::read32 ("0${character}000000", 0)
-            Error _ => unexpected ()
-            Success word => expect (word, digit)
-
-arithmetic work =
-    handle Arith
-        overflow _ _ _ wrapped =>
-            expect ("overflow", validArithmetic)
-            wrapped
-        divideByZero _ _ =>
-            expect ("division by zero", validArithmetic)
-            0.0
-        remainderByZero _ =>
-            expect ("remainder by zero", validArithmetic)
-            0
-    work ()
-
-accepted outcome = match outcome
-    synth::Valid graph => graph
-    synth::Invalid _ =>
-        expect (false, true)
-        Graphs::empty
-
-refused (outcome, expected) = match outcome
-    synth::Invalid actual => expect (actual == expected, true)
-    synth::Valid _ => unexpected ()
 
 monoPort (name, rate, unit) = synth::Port(name = name, rate = rate, channels = 1, unit = unit)
 
@@ -60,110 +23,15 @@ cable (source, destination) = synth::Cable(source = source, outlet = 0, destinat
 // Rewiring whatever 1->2->3 chain onto the direct 1->3 cable.
 bypass (graph) = accepted (Graphs::rewire (graph, cable (1, 3)))
 
-valid (outcome, check) = match outcome
-    synth::Valid value => check value
-    synth::Invalid _ => unexpected ()
-
-prepared (graph, count) = valid (Graphs::prepare graph, \plan => expect (length plan.order, count))
-
-observed snapshot =
-    handle static Signal<synth::Observation>
-        read => snapshot
-    expect (Observations::parameter (10, "cutoff") ?: -1.0, 440.0)
-    expect (Observations::parameter (20, "cutoff") ?: -1.0, 880.0)
-    succeeds (Observations::component 10, \component => expect (component.activeVoices, 3))
-    renderRefused (Observations::component 99)
-    renderRefused (Observations::parameter (30, "cutoff"))
-
-// [SYNTH-DSP] Numerical isolation is required: these paths must not need a host, UI or device.
-
-near (actual, expected, tolerance) = expect (abs (actual - expected) <= tolerance, true)
-
-sameStructure (actual, expected) = expect (structuralEquals (actual, expected), true)
-
-unexpected () = expect (false, true)
-
-tau = 6.283185307179586
-
-pi = 3.141592653589793
-
-rate = 48000.0
-
-sineWave (frequency, i) = sin (tau * frequency * toFloat i / rate)
-
-// The sine of `x` whole turns.
-turn x = sin (tau * x)
-
-sineAt (gain, frequency, i) = gain * sineWave (frequency, i)
-
-absSum samples = foldList (samples, 0.0, \(sum, value) => sum + abs value)
-
-oscillator (rate, frequency, waveform) = synth::OscillatorConfig(sampleRate = rate, frequency = frequency, pulseWidth = 0.5, waveform = waveform)
-
-sampleAt (config, phase) = (Oscillators::next (config, synth::OscillatorState(phase = phase))).sample
-
-oscRun (config, initialState, count) = foldList (toList (range (0, count)), initialState, \(held, _) => (Oscillators::next (config, held)).next)
-
-oscCase (rate, frequency, waveform) =
-    config = oscillator (rate, frequency, waveform)
-    succeeds (Oscillators::configure config, \accepted =>
-        whole = oscRun (accepted, Oscillators::initial, 512)
-        split = oscRun (accepted, oscRun (accepted, Oscillators::initial, 31), 481)
-        near (whole.phase, split.phase, 0.000000000001)
-        forEachList (toList (range (0, 128)), \i =>
-            value = (Oscillators::next (accepted, synth::OscillatorState(phase = toFloat i / 128.0))).sample
-            expect (value >= -1.01 && value <= 1.01, true)))
-
-invalidOscillator config = renderRefused (Oscillators::configure config)
-
-validEnvelope config = succeeds (Envelopes::configure config, \_ => expect (true, true))
-
-invalidEnvelope config = renderRefused (Envelopes::configure config)
-
-invalidFilter config = renderRefused (Filters::configure config)
-
-oscFrequencies rate = forEachList ([0.0, 55.0, 440.0, 7000.0], \frequency => forEachList ([synth::Sine, synth::Saw, synth::Pulse, synth::Triangle], \wave => oscCase (rate, frequency, wave)))
-
-envRun (config, initialState, count) = foldList (toList (range (0, count)), initialState, \(held, _) => Envelopes::next (config, held))
-
-levelOf (envelope) = envelope.level
-
-envelopeCase rate =
-    config = synth::EnvelopeConfig(sampleRate = rate, attack = 4.0 / rate, decay = 4.0 / rate, sustain = 0.5, release = 4.0 / rate)
-    started = Envelopes::noteOn (Envelopes::initial ())
-    attack = envRun (config, started, 4)
-    sustain = envRun (config, attack, 4)
-    near (attack.level, 1.0, 0.000000001)
-    near (sustain.level, 0.5, 0.000000001)
-    near (levelOf (Envelopes::next (config, sustain)), 0.5, 0.000000001)
-    releasing = Envelopes::noteOff (config, sustain)
-    near ((envRun (config, releasing, 4)).level, 0.0, 0.000000001)
-    near ((Envelopes::noteOff (config, releasing)).releaseStep, releasing.releaseStep, 0.0)
-    early = envRun (config, started, 2)
-    near ((Envelopes::noteOn early).level, early.level, 0.0)
-    near ((envRun (config, Envelopes::noteOff (config, early), 4)).level, 0.0, 0.000000001)
-
-filterRun (coefficients, initialState, count, input) = foldList (toList (range (0, count)), initialState, \(held, _) => (Filters::next (coefficients, held, input)).next)
-
-filterCase (rate, cutoff, resonance) =
-    config = synth::FilterConfig(sampleRate = rate, cutoff = cutoff, resonance = resonance)
-    succeeds (Filters::configure config, \c =>
-        settled = filterRun (c, Filters::initial, 4096, 1.0)
-        output = Filters::next (c, settled, 1.0)
-        near (output.low, 1.0, 0.0001)
-        near (output.high, 0.0, 0.0001)
-        split = filterRun (c, filterRun (c, Filters::initial, 127, 1.0), 3969, 1.0)
-        near (settled.integratorOne, split.integratorOne, 0.0)
-        near (settled.integratorTwo, split.integratorTwo, 0.0)
-        faded = filterRun (c, settled, 4096, 0.0)
-        near (faded.integratorTwo, 0.0, 0.0001))
-
 parameter key = synth::Parameter(key = key, label = "Cutoff", unit = synth::Hertz, minimum = 20.0, maximum = 20000.0, initial = 440.0, automatable = true)
 
-readValue snapshot =
+// `check` run with the observation Signal answering from `snapshot`.
+observing (snapshot, check) =
     handle static Signal<synth::Observation>
         read => snapshot
-    Observations::parameter (1, "cutoff") ?: -1.0
+    check ()
+
+readValue snapshot = observing (snapshot, \() => Observations::parameter (1, "cutoff") ?: -1.0)
 
 planFor graph = match Graphs::prepare graph
     synth::Valid plan => plan
@@ -182,6 +50,15 @@ renderRefused result = match result
     Success _ => unexpected ()
     Error _ => expect (true, true)
 
+// A fresh render of `graph`'s first `frames`, which must be refused.
+renderRefusedFrom (graph, frames) = renderRefused (freshRender (graph, frames))
+
+// A fresh render of `graph`'s first `frames`, before its Result is read.
+freshRender (graph, frames) = Renderer::block (planFor graph, rate, Parameters::initial graph, rendered (Renderer::start graph), frames)
+
+// The 64-point one-partial sine table the wavetable journeys load.
+sineTable (check) = succeeds (synth::Wavetables::prepare (64, [synth::TableSpectrum(amplitudes = [1.0], phases = [0.0])]), check)
+
 // [SYNTH-RENDER-BLOCKS] The switches the editor stores on a module, as one more parameter.
 switched (n, key, high, value) = n(parameters = listAppend n.parameters (synth::Parameter(key = key, label = key, unit = synth::Ratio, minimum = 0.0, maximum = high, initial = value, automatable = true)))
 
@@ -199,11 +76,7 @@ clipReady3 action = match action
 // A sine through a low-pass whose cutoff inlet an LFO drives.
 switchedRender (oscillator, filter, lfo) = clipOf (built ([oscillator, filter, lfo, Components::output 3], modulatedRoute ()))
 
-clipSamples outcome = match outcome
-    Success clip => clip.clipSamples
-    Error why =>
-        expect (synth::Faults::detail why, "a rendered clip")
-        []
+clipSamples outcome = outcomeOr (outcome, "a rendered clip", [], \clip => clip.clipSamples)
 
 switchedSamples (oscillator, filter, lfo) = clipSamples (switchedRender (oscillator, filter, lfo))
 
@@ -223,13 +96,13 @@ fanRoute () = [cable (1, 2), cable (1, 3)]
 
 serial (nodes) = built (nodes, chainRoute ())
 
-sineThrough (gain) = serial ([Components::sine (1, 440.0), Components::gain (2, gain), Components::output 3])
+sineThrough (gain) = through (Components::gain (2, gain))
 
-sineFiltered (cutoff, resonance) = serial ([Components::sine (1, 440.0), Components::lowpass (2, cutoff, resonance), Components::output 3])
+sineFiltered (cutoff, resonance) = through (Components::lowpass (2, cutoff, resonance))
 
 sineChain () = sineThrough (0.25)
 
-blockOf (graph, frames) = rendered (Renderer::block (planFor graph, rate, Parameters::initial graph, rendered (Renderer::start graph), frames))
+blockOf (graph, frames) = rendered (freshRender (graph, frames))
 
 renderBlock (plan, parameters, prior, frames) = rendered (Renderer::block (plan, rate, parameters, prior, frames))
 
@@ -248,7 +121,7 @@ fitGainJourney (graph, samples) =
     source = synth::FitSource(identifier = "sine fixture", licence = "generated fixture", sampleRate = 48000)
     training = synth::FitReference(source = source, samples = samples)
     evaluation = synth::FitReference(source = source(identifier = "silent fixture"), samples = mapList (samples, \_ => 0.0))
-    config = synth::FitConfig(parameters = [synth::FitParameter(node = 2, key = "gain", minimum = 0.0, maximum = 1.0)], seed = 17, evaluations = 1, tolerance = 0.0001)
+    config = fitConfig (17, 1)
     refusedWith (synth::FitReports::fit (graph, config, training, training), "Training and evaluation need distinct source identities and sample data.")
     forEachList ([source(licence = ""), source(identifier = ""), source(sampleRate = 44100)], \bad => refusedWith (synth::FitReports::fit (graph, config, training, evaluation(source = bad)), "Fit references need labelled, licensed, finite mono clips at 48 kHz and a supported FFT length."))
     succeeds (synth::FitReports::fit (graph, config, training, evaluation), \report =>
@@ -264,13 +137,11 @@ feedbackExpected (samples, i) =
     expected = 0.5 * (sineWave (440.0, i) + previous)
     near (listGet samples i ?: -888.0, expected, 0.00000000001)
 
-metersObserved snapshot =
-    handle static Signal<synth::Observation>
-        read => snapshot
+metersObserved snapshot = observing (snapshot, \() =>
     expect ((Observations::snapshot ()).samplePosition, 128)
     succeeds (Observations::component 3, \meter =>
         expect (meter.peak <= 0.25 && meter.peak > 0.24, true)
-        expect (meter.rms > 0.1 && meter.rms < 0.25, true))
+        expect (meter.rms > 0.1 && meter.rms < 0.25, true)))
 
 // [SYNTH-ADVANCED-CORE-PORTS] Same-frame events apply in their given order, and any block split gives the same audio.
 splitAt (plan, snapshot, first, events, cut) = match Renderer::automated (plan, 48000.0, snapshot, first, cut, filterList (events, \e => e.samplePosition < cut))
@@ -337,6 +208,15 @@ clipFrom (clips, identity) = match synth::ClipInputs::completed (clips, identity
 
 channelOf (clip, frame, channel) = listGet clip.clipSamples (satAdd (satMul frame clip.clipChannels) channel) ?: 999.0
 
+// A clip of `channels` channels carrying exactly the samples of `of`.
+carries (clip, channels, of) = expect (clip.clipChannels == channels && structuralEquals (clip.clipSamples, of.clipSamples), true)
+
+// The join and route clips at `joinAt` and `routeAt`, handed to `check`.
+withRoute (clips, joinAt, routeAt, check) = check (clipFrom (clips, joinAt)) (clipFrom (clips, routeAt))
+
+// The `c`-th per-channel gain clip, or the source clip after a failed lookup.
+gainOf (gains, clips, c) = listGet gains c ?: clipFrom (clips, 0)
+
 // [SYNTH-ADVANCED-CORE-MODELS] A graph output that is NaN, infinite or past 10^6 is an error, never published audio.
 refusedOutput value = refusedAs (synth::RenderInputs::sample (framed value, 4), "numerical", "Non-finite or excessive graph output.")
 
@@ -369,7 +249,7 @@ storedProcessors nodes =
     storedProcessor (synth::Granular(resource = source, capacity = 2, seed = 7), "synth.grain-cloud", 1, false)
     storedProcessor (synth::Panner, "synth.panner", 1, false)
     storedProcessor (synth::External(identifier = "vendor.module", latency = 80), "external:vendor.module", 1, false)
-    succeeds (synth::Wavetables::prepare (64, [synth::TableSpectrum(amplitudes = [1.0], phases = [0.0])]), \table => storedProcessor (synth::TableOscillator(table = table), "synth.wavetable", 1, true))
+    sineTable (\table => storedProcessor (synth::TableOscillator(table = table), "synth.wavetable", 1, true))
 
 controls () = [0.0, 0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999, 1.0]
 
@@ -403,36 +283,32 @@ declared n =
 // [SYNTH-ADVANCED-CORE-SIGNALS] A controller write is Pending until resolved, then Applied with the new revision or
 // Rejected with its typed fault; only an applied write changes the audible snapshot.
 
-appliedAt (receipt, revision) = match receipt.status
-    synth::Applied at => expect (at, revision)
-    _ => expect ("not applied", "applied")
+// A controller write's status, checked whole against `wanted`: any other status fails naming both.
+statusIs (receipt, wanted) = sameStructure (receipt.status, wanted)
 
-rejectedWith (receipt, fault) = match receipt.status
-    synth::Rejected why => expect (why, fault)
-    _ => expect ("not rejected", "rejected")
+appliedAt (receipt, revision) = statusIs (receipt, synth::Applied(revision = revision))
 
-stillPending (receipt, edit) = match receipt.status
-    synth::Pending waiting => expect (waiting, edit)
-    _ => expect ("not pending", "pending")
+rejectedWith (receipt, fault) = statusIs (receipt, synth::Rejected(fault = fault))
+
+stillPending (receipt, edit) = statusIs (receipt, synth::Pending(edit = edit))
 
 // [SYNTH-ADVANCED-GRAINS-PLAYBACK] One grain on a constant source shows its window: zero at both ends, the Hann peak
 // or ASR sustain in the middle, a three-frame grain, silence after the grain ends, and the same audio for any block split.
 
-flat () = mapList (toList (range (0, 64)), \_ => 1.0)
+flat () = steady (64, 1.0)
 
 held (window, duration, pan) = synth::GrainControls(window = window, start = 10.0, rate = 0.0, duration = duration, amplitude = 1.0, pan = pan)
 
 centre = 0.7071067811865476
 
-oneGrain (controls, frames, check) = succeeds (Grains::prepare (flat (), 4), \pool => succeeds (Grains::trigger (pool, controls), \admitted => succeeds (Grains::block (admitted.pool, frames), check)))
+oneGrain (controls, frames, check) = succeeds (Grains::prepare (flat (), 4), \pool => grainBlockAfterTrigger (pool, controls, frames, check))
 
 frameAt (samples, index) = listGet samples index ?: -9.0
 
 hann9 block =
     expect (length block.left, 16)
-    near (frameAt (block.left, 0), 0.0, 0.0)
-    near (frameAt (block.left, 8), 0.0, 0.0)
-    near (frameAt (block.left, 4), centre, 0.000000000001)
+    // Zero at both ends of the nine-frame window, unity at its centre.
+    nearRows ([{ got = frameAt (block.left, 0), want = 0.0, within = 0.0 }, { got = frameAt (block.left, 8), want = 0.0, within = 0.0 }, { got = frameAt (block.left, 4), want = centre, within = 0.000000000001 }])
     forEachList (toList (range (0, 9)), \k => near (frameAt (block.left, k), centre * (sin (pi * toFloat k / 8.0) * sin (pi * toFloat k / 8.0)), 0.000000000001))
     // cos and sin of π/4 differ in the last bit, so the centred sides agree to 1e-15, not bit for bit.
     forEachList (toList (range (0, 16)), \k => near (frameAt (block.left, k), frameAt (block.right, k), 0.000000000000001))
@@ -444,14 +320,11 @@ asr9 block =
     forEachList ([{ k = 0, v = 0.0 }, { k = 1, v = 0.5 }, { k = 2, v = 1.0 }, { k = 4, v = 1.0 }, { k = 6, v = 1.0 }, { k = 7, v = 0.5 }, { k = 8, v = 0.0 }], \p => near (frameAt (block.left, p.k), centre * p.v, 0.000000000001))
 
 short3 block =
-    near (frameAt (block.left, 0), 0.0, 0.0)
-    near (frameAt (block.left, 1), centre, 0.000000000001)
-    near (frameAt (block.left, 2), 0.0, 0.0)
+    nearRows ([{ got = frameAt (block.left, 0), want = 0.0, within = 0.0 }, { got = frameAt (block.left, 1), want = centre, within = 0.000000000001 }, { got = frameAt (block.left, 2), want = 0.0, within = 0.0 }])
     expect (length block.next.voices, 0)
 
 hardLeft block =
-    near (frameAt (block.left, 4), 1.0, 0.000000000001)
-    near (frameAt (block.right, 4), 0.0, 0.000000000001)
+    nearRows ([{ got = frameAt (block.left, 4), want = 1.0, within = 0.000000000001 }, { got = frameAt (block.right, 4), want = 0.0, within = 0.000000000001 }])
 
 // Sixteen one-frame blocks render exactly the samples of one sixteen-frame block.
 stepped (outcome, _) = match outcome
@@ -462,8 +335,7 @@ stepped (outcome, _) = match outcome
 
 partitioned (controls, whole) = succeeds (Grains::prepare (flat (), 4), \pool => succeeds (Grains::trigger (pool, controls), \admitted =>
     succeeds (foldList (toList (range (0, 16)), Success(value = { pool = admitted.pool, left = [], right = [] }), stepped), \run =>
-        sameStructure (run.left, whole.left)
-        sameStructure (run.right, whole.right))))
+        sameStereo (sameStructure, run, whole))))
 
 // A later trigger with other controls (here silent, ASR, hard right) leaves a sounding grain's own settings alone.
 retained whole = succeeds (Grains::prepare (flat (), 4), \pool => succeeds (Grains::trigger (pool, held (synth::HannWindow, 9, 0.0)), \first =>
@@ -477,10 +349,13 @@ shifterKeyed (found, p, key) = match p.key == key
 
 shifterValue (n, key) = foldList (n.parameters, -1.0, \(found, p) => shifterKeyed (found, p, key))
 
-// A sine through a 64-point spectral shift of `bins` bins, rendered for one 64-frame clip.
-shiftedBy bins =
+// The 64-point spectral shift node with its shift dial set to `bins`.
+shifted (bins) =
     shift = Components::spectral (2, 64, 16, 3.0)
-    clipOf (serial ([Components::sine (1, 440.0), shift(parameters = mapList (shift.parameters, \p => shiftSet (p, bins))), Components::output 3]))
+    shift(parameters = mapList (shift.parameters, \p => shiftSet (p, bins)))
+
+// A sine through a 64-point spectral shift of `bins` bins, rendered for one 64-frame clip.
+shiftedBy bins = clipOf (through (shifted bins))
 
 shiftSet (p, bins) = match p.key == "shift"
     true => p(initial = bins)
@@ -496,12 +371,15 @@ renders outcome = match outcome
 // shift was truncated, the shift dial spanned ±2047 at every size and block accumulation was quadratic.
 spectralSizes = [64, 128, 256, 512, 1024, 2048, 4096]
 
+// A processor's declared latency in samples, against its expected value.
+latencyIs (n, want) = succeeds (Timings::latency n, \samples => expect (samples, want))
+
 // Latency size − 1 and tail 2 · (size − 1), which outlasts latency plus a hop, for both spectral nodes at every size.
 spectralTimed size =
     most = toFloat (satSub (intDiv size 2) 1)
     whole = toFloat (satSub size 1)
     forEachList ([Components::spectral (4, size, intDiv size 4, 3.0), Components::pitchShifter (5, size, 7.0, 25.0)], \n =>
-        succeeds (Timings::latency n, \late => expect (late, whole))
+        latencyIs (n, whole)
         succeeds (Timings::tail n, \held => expect ("${held} ${held >= whole + toFloat (intDiv size 4)}", "${2.0 * whole} true")))
     expect (SpectralStreams::tail size, satMul 2 (satSub size 1))
     expect (SpectralStreams::latency size, satSub size 1)
@@ -509,14 +387,14 @@ spectralTimed size =
 
 // At 64 points the dial's ends ±31 play, ±32 and the old ±2047 are refused, and no fraction is ever truncated.
 shiftEdges () =
-    forEachList ([31.0, -31.0, 30.0, 10.0, -3.0, 1.0, -1.0, 0.0], \bins => expect ("${bins}: ${playedBy (shiftedBy bins)}", "${bins}: plays"))
+    // `playsAs` reads one shifted render back as the outcome the journey names.
+    playsAs = \(bins, outcome) => expect ("${bins}: ${playedBy (shiftedBy bins)}", "${bins}: ${outcome}")
+    forEachList ([31.0, -31.0, 30.0, 10.0, -3.0, 1.0, -1.0, 0.0], \bins => playsAs (bins, "plays"))
     forEachList ([31.0, -31.0, 0.0], \bins => expect (length ((accepted (shiftAdded bins)).nodes), 1))
     forEachList ([32.0, -32.0, 2047.0, -2047.0], \bins => refused (shiftAdded bins, synth::InvalidParameter))
-    forEachList ([10.7, -0.5, 0.25, 0.999, -30.5, 0.000001, 30.0001, -0.0001, 1.5], \bins => expect ("${bins}: ${playedBy (shiftedBy bins)}", "${bins}: Spectral shift must be a whole number of bins."))
+    forEachList ([10.7, -0.5, 0.25, 0.999, -30.5, 0.000001, 30.0001, -0.0001, 1.5], \bins => playsAs (bins, "Spectral shift must be a whole number of bins."))
 
-shiftAdded bins =
-    shift = Components::spectral (2, 64, 16, 3.0)
-    Graphs::add (Graphs::empty, shift(parameters = mapList (shift.parameters, \p => shiftSet (p, bins))))
+shiftAdded bins = Graphs::add (Graphs::empty, shifted bins)
 
 playedBy outcome = match outcome
     Success _ => "plays"
@@ -540,7 +418,7 @@ blocksJoined () =
 floatsJoined () =
     floats = Sequences::flattened [[1.5, 2.0], [], [3.0], [-0.25, 0.000001, 48000.0]]
     expect (length floats, 6)
-    forEachList ([{ at = 0, want = 1.5 }, { at = 1, want = 2.0 }, { at = 2, want = 3.0 }, { at = 3, want = -0.25 }, { at = 4, want = 0.000001 }, { at = 5, want = 48000.0 }], \c => expect (listGet floats c.at ?: 0.0, c.want))
+    sameStructure (floats, [1.5, 2.0, 3.0, -0.25, 0.000001, 48000.0])
     words = Sequences::flattened [["a", "bc"], ["d"]]
     expect (join (words, "|"), "a|bc|d")
     records = Sequences::flattened [[{ level = 0.5, name = "low" }], [{ level = 2.25, name = "high" }]]

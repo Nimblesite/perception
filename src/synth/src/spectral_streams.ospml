@@ -172,4 +172,3 @@ module SpectralStreams
     ```
     *)
     export view (config, held, channel, position) = Outcomes::carried (Ffts::forward (windowed (held.input, config.size)), \bins => Success(value = SpectralView(channel = channel, position = position, size = config.size, bins = Sequences::mapIndexed (bins, \(index, value) => bin (config, index, value)))))
-

@@ -10,10 +10,16 @@ bool Plugin::open(const std::string& path, const std::string& identifier) {
     for (const auto& info : module->getFactory().classInfos()) {
         if (info.ID().toString() != identifier || info.category() != kVstAudioEffectClass) continue;
         provider = owned(new PlugProvider(module->getFactory(), info, true));
-        if (!provider->initialize()) { error = "Plug-in initialization failed"; return false; }
+        if (!provider->initialize()) {
+            error = "Plug-in initialization failed";
+            return false;
+        }
         component = provider->getComponentPtr();
         processor = FUnknownPtr<IAudioProcessor>(component);
-        if (!component || !processor) { error = "No audio processor interface"; return false; }
+        if (!component || !processor) {
+            error = "No audio processor interface";
+            return false;
+        }
         const auto controller = provider->getControllerPtr();
         if (controller && controller->setComponentHandler(restarts) != kResultOk) {
             error = "The plug-in refused the host component handler";
@@ -75,8 +81,10 @@ bool note(EventList& events, bool down) {
     event.type = down ? Event::kNoteOnEvent : Event::kNoteOffEvent;
     event.busIndex = 0;
     event.sampleOffset = 0;
-    if (down) event.noteOn = {0, 60, 0, 0.8f, 0, 42};
-    else event.noteOff = {0, 60, 0, 42, 0};
+    if (down)
+        event.noteOn = {0, 60, 0, 0.8f, 0, 42};
+    else
+        event.noteOff = {0, 60, 0, 42, 0};
     return events.addEvent(event) == kResultOk;
 }
 
@@ -109,8 +117,7 @@ bool measured(const HostProcessData& data, double& peak) {
 }
 
 bool saved(IComponent& component, MemoryStream& stream) {
-    return component.getState(&stream) == kResultOk && stream.getSize() > 0 &&
-           stream.getSize() <= 16 * 1024 * 1024;
+    return component.getState(&stream) == kResultOk && stream.getSize() > 0 && stream.getSize() <= 16 * 1024 * 1024;
 }
 
 // Controllers that do not consume processor state report kNotImplemented (e.g. TAL-NoiseMaker).
@@ -125,14 +132,14 @@ bool Plugin::synchronizeController() {
     if (!controller || FUnknownPtr<IEditController>(component).getInterface()) return true;
     MemoryStream stream;
     error = "Initial processor/controller state synchronization failed";
-    return saved(*component, stream) &&
-           stream.seek(0, IBStream::kIBSeekSet, nullptr) == kResultOk &&
+    return saved(*component, stream) && stream.seek(0, IBStream::kIBSeekSet, nullptr) == kResultOk &&
            notifyController(*controller, stream);
 }
 
 bool sameState(const MemoryStream& first, const MemoryStream& second) {
     return first.getSize() == second.getSize() &&
-           (first.getSize() == 0 || std::memcmp(first.getData(), second.getData(), static_cast<size_t>(first.getSize())) == 0);
+           (first.getSize() == 0 ||
+            std::memcmp(first.getData(), second.getData(), static_cast<size_t>(first.getSize())) == 0);
 }
 
 bool automatable(IEditController& controller, ParameterInfo& info) {
@@ -140,8 +147,7 @@ bool automatable(IEditController& controller, ParameterInfo& info) {
     if (count < 0 || count > 65536) return false;
     for (int32 index = 0; index < count; ++index) {
         if (controller.getParameterInfo(index, info) != kResultOk) return false;
-        if ((info.flags & ParameterInfo::kCanAutomate) && !(info.flags & ParameterInfo::kIsReadOnly))
-            return true;
+        if ((info.flags & ParameterInfo::kCanAutomate) && !(info.flags & ParameterInfo::kIsReadOnly)) return true;
     }
     return false;
 }
@@ -200,13 +206,14 @@ bool Plugin::stateRoundTrip() {
         MemoryStream comparison;
         error = "Private controller state failed to round trip";
         if (privateState.seek(0, IBStream::kIBSeekSet, nullptr) != kResultOk ||
-            controller->setState(&privateState) != kResultOk ||
-            controller->getState(&comparison) != kResultOk ||
-            !sameState(privateState, comparison)) return false;
+            controller->setState(&privateState) != kResultOk || controller->getState(&comparison) != kResultOk ||
+            !sameState(privateState, comparison))
+            return false;
     }
     error = "Restored processor state differs from saved state";
     if (!saved(*component, restored) || !sameState(original, restored)) return false;
-    error = "Restored controller value differs from initial value: " + std::to_string(initial) + " vs " + std::to_string(controller->getParamNormalized(parameter.id));
+    error = "Restored controller value differs from initial value: " + std::to_string(initial) + " vs " +
+            std::to_string(controller->getParamNormalized(parameter.id));
     return std::abs(controller->getParamNormalized(parameter.id) - initial) < 0.000001;
 }
 
@@ -223,7 +230,7 @@ bool Plugin::run(double& peak) {
     }
     return true;
 }
-}
+} // namespace osprey::vst
 
 int probe(const std::string& path, const std::string& identifier) {
     osprey::vst::Plugin plugin;
@@ -246,7 +253,8 @@ int verifyRestart(const std::string& path, const std::string& identifier) {
         if (controller->getParameterInfo(i, info) != kResultOk) return failed("Missing parameter");
         if (!(info.flags & ParameterInfo::kIsProgramChange)) continue;
         if (controller->setParamNormalized(info.id, 0.5) != kResultOk ||
-            !(plugin.restarts->take() & kParamValuesChanged) || plugin.restarts->take() != 0) return failed("Missing or repeated restart");
+            !(plugin.restarts->take() & kParamValuesChanged) || plugin.restarts->take() != 0)
+            return failed("Missing or repeated restart");
         std::cout << "Received program parameter restart\n";
         return 0;
     }

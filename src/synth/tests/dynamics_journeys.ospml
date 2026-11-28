@@ -16,8 +16,7 @@ limitPeak side = foldList (side, 0.0, \(high, value) => larger (high, abs value)
 limitUnclamped (left, right, gains, ceiling) = forEachList (toList (range (0, length left)), \i =>
     g = listGet gains i ?: 9.0
     expect (g > 0.0 && g <= 1.0, true)
-    expect (abs (listGet left i ?: 0.0) * g <= ceiling * 1.000000001, true)
-    expect (abs (listGet right i ?: 0.0) * g <= ceiling * 1.000000001, true))
+    forEachList ([left, right], \side => expect (abs (listGet side i ?: 0.0) * g <= ceiling * 1.000000001, true)))
 
 limitChecked (left, right, c, gains) =
     expect (length gains, length left)
@@ -26,14 +25,13 @@ limitChecked (left, right, c, gains) =
     expect (limitPeak out <= c.ceiling, true)
     expect (limitPeak out >= c.ceiling * 0.95, limitPeak left > c.ceiling)
 
-limitCase (left, right, c) = match Limiters::gains (left, right, rate, c.ceiling, c.ms, c.release)
-    Error _ => unexpected ()
-    Success gains => limitChecked (left, right, c, gains)
+// The limiter's gains for `left` and `right` at `c`'s settings handed to `check`.
+limiterGains (left, right, c, check) = successOr (Limiters::gains (left, right, rate, c.ceiling, c.ms, c.release), check)
+
+limitCase (left, right, c) = limiterGains (left, right, c, \gains => limitChecked (left, right, c, gains))
 
 // A signal under the ceiling passes bit-exact: every gain is exactly one.
-limitTransparent (amplitude, c) = match Limiters::gains (limitSine (amplitude, 2400), limitSine (amplitude, 2400), rate, c.ceiling, c.ms, c.release)
-    Error _ => unexpected ()
-    Success gains => forEachList (gains, \g => expect (g, 1.0))
+limitTransparent (amplitude, c) = limiterGains (limitSine (amplitude, 2400), limitSine (amplitude, 2400), c, \gains => forEachList (gains, \g => expect (g, 1.0)))
 
 // One impulse: unity until the lookahead (and the oversampler's half width) opens, the exact need on the impulse,
 // recovering after it.
@@ -46,16 +44,12 @@ limitImpulseGains (gains, block, c) =
     expect ((listGet gains 5999 ?: 0.0) > (listGet gains (1001 + block) ?: 1.0), true)
     expect ((listGet gains 5999 ?: 0.0) > 0.99, c.release <= 0.01)
 
-limitOneImpulse (c, block) = match Limiters::gains (limitImpulse (6000, 1000, 4.0), limitImpulse (6000, 0, 0.0), rate, c.ceiling, c.ms, c.release)
-    Error _ => unexpected ()
-    Success gains => limitImpulseGains (gains, block, c)
+limitOneImpulse (c, block) = limiterGains (limitImpulse (6000, 1000, 4.0), limitImpulse (6000, 0, 0.0), c, \gains => limitImpulseGains (gains, block, c))
 
 // A quarter-rate sine at 45 degrees: every sample is 0.707 of a true peak of 1, which only the oversampler sees.
 limitBetween i = sin (1.5707963267948966 * toFloat i + 0.7853981633974483)
 
-limitInterSample c = match Limiters::gains (mapList (toList (range (0, 4800)), limitBetween), mapList (toList (range (0, 4800)), limitBetween), rate, c.ceiling, c.ms, c.release)
-    Error _ => unexpected ()
-    Success gains => forEachList ([1200, 2400, 3600], \i => limitHeldUnder (listGet gains i ?: 9.0, c.ceiling))
+limitInterSample c = limiterGains (mapList (toList (range (0, 4800)), limitBetween), mapList (toList (range (0, 4800)), limitBetween), c, \gains => forEachList ([1200, 2400, 3600], \i => limitHeldUnder (listGet gains i ?: 9.0, c.ceiling)))
 
 // The held gain brings the true peak of 1 down to the ceiling within the oversampler's 1% accuracy.
 // An 8-sample quarter-rate burst from `start` in silence: its samples read 0.707 but it peaks at 1.0061 between them, so
@@ -66,9 +60,7 @@ limitBurstSample (start, i) = match i >= start && i < satAdd start 8
 
 limitBurst (c, start) =
     burst = mapList (toList (range (0, 2400)), \i => limitBurstSample (start, i))
-    match Limiters::gains (burst, burst, rate, c.ceiling, c.ms, c.release)
-        Error _ => unexpected ()
-        Success gains => forEachList (toList (range (start, satAdd start 8)), \i => expect ((listGet gains i ?: 9.0) * 1.0061 <= c.ceiling * 1.02, true))
+    limiterGains (burst, burst, c, \gains => forEachList (toList (range (start, satAdd start 8)), \i => expect ((listGet gains i ?: 9.0) * 1.0061 <= c.ceiling * 1.02, true)))
 
 limitHeldUnder (g, ceiling) =
     expect (g <= ceiling * 1.01, true)
@@ -107,15 +99,12 @@ spectrumPick (found, band, centre) = match band.centre == centre
 // Each listed band reads its tone's level within 0.1 dB; every band two octaves from all tones reads under -60 dB.
 spectrumChecked (bands, parts) =
     expect (length bands, 10)
-    forEachList (parts, \p => near ((spectrumBand (bands, p.band)).level, p.level, 0.1))
-    forEachList (parts, \p => near ((spectrumBand (bands, p.band)).peak, p.level, 0.1))
+    forEachList ([\band => band.level, \band => band.peak], \read => forEachList (parts, \p => near (read (spectrumBand (bands, p.band)), p.level, 0.1)))
     forEachList (filterList (bands, \band => spectrumFar (parts, band.centre)), \band => expect (band.level < -60.0, true))
 
 spectrumFar (parts, centre) = length (filterList (parts, \p => p.band > centre * 0.3 && p.band < centre * 3.0)) == 0
 
-spectrumCase (parts, count) = match Spectra::bands (spectrumSignal (parts, count), rate, 4096, 2048)
-    Error _ => unexpected ()
-    Success bands => spectrumChecked (bands, parts)
+spectrumCase (parts, count) = successOr (Spectra::bands (spectrumSignal (parts, count), rate, 4096, 2048), \bands => spectrumChecked (bands, parts))
 
 spectrumWhy = "A spectrum needs a power-of-two frame of 64 to 4096, a hop of at least 1 and a rate of 8 to 384 kHz."
 
