@@ -804,7 +804,7 @@ def main():
         timeout=600,
     )
     if args.test or args.live_latency:
-        # [DAW-TRANSPORT-LIVE-LATENCY] The 20 ms live-latency journey is a non-goal: run it with --live-latency.
+        # [DAW-TRANSPORT-LIVE-LATENCY] The 20 ms live-latency journey is deferred work, out of CI: run it with --live-latency.
         label = ("-L" if args.live_latency else "-LE", "live-latency")
         run(
             "ctest",

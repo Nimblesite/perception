@@ -71,7 +71,7 @@ _vst_worker_build:
 _vst_worker_test:
 	python3 src/toolchain/hosts/synth_vst/build.py --test
 
-## _vst_worker_live_latency: The 20 ms live-latency journey alone; a non-goal, so not in CI [DAW-TRANSPORT-LIVE-LATENCY].
+## _vst_worker_live_latency: The 20 ms live-latency journey alone; deferred work, so not in CI [DAW-TRANSPORT-LIVE-LATENCY].
 _vst_worker_live_latency:
 	python3 src/toolchain/hosts/synth_vst/build.py --live-latency
 
