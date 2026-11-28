@@ -1,0 +1,5 @@
+// A null send observes the first frame: the Perception Studio patch with its oscillator and filter.
+{"send":null,"expect":{"root":true,"text":{"contains":"Oscillator"},"diagnostics":0}}
+// [STUDIO-ROUTING-PRESENTATION] The launch boundary must retain the complete Perception Studio workspace.
+{"send":{"frame":0.016},"expect":{"root":true,"text":{"contains":"Scope"},"diagnostics":0}}
+{"send":{"frame":0.016},"expect":{"root":true,"text":{"contains":"Filter Cutoff"},"diagnostics":0}}

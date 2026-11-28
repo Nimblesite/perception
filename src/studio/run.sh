@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Builds Perception Studio into the GPUI host, bundles it as "Perception Studio.app" with the Perception Studio logo as
+# its Dock icon, and opens Perception Studio's signal-flow editor.
+#   run.sh            build, bundle and open
+#   run.sh --bundle   build and bundle only; prints the bundle's path
+#   run.sh --smoke    replay smoke.jsonl through the host without a window
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+repo=$(cd "$here/../.." && pwd)
+machine="$repo/src/osprey/packages/signal_flow/signal_flow.machine.json"
+if [ "${1:-}" = --smoke ]; then
+    OSPREY_GPUI_APP="$here" exec "$repo/src/toolchain/hosts/gpui/run.sh" --smoke --machine "$machine"
+fi
+OSPREY_GPUI_APP="$here" "$repo/src/toolchain/hosts/gpui/run.sh" --build
+export OSPREY_GPUI_APP_NAME=synth OSPREY_GPUI_TITLE="Perception Studio" OSPREY_GPUI_WINDOW=1152x756 OSPREY_GPUI_CHROME=bare OSPREY_GPUI_LIGHTS=16,18
+app=$("$repo/src/toolchain/hosts/gpui/bundle.sh" "$here/build" "Perception Studio" dev.ospreylang.synth \
+    "$repo/src/osprey/packages/signal_flow/skins/prism/logo.png" "$machine" | tail -1)
+python3 "$repo/src/toolchain/hosts/synth_vst/build.py"
+python3 - "$app" "$repo/target/vst-worker/osprey-vst-worker" <<'BUNDLE_WORKER'
+import json
+import pathlib
+import shutil
+import sys
+folder = pathlib.Path(sys.argv[1]) / "Contents/MacOS"
+shutil.copy2(sys.argv[2], folder / "osprey-vst-worker")
+(folder / "osprey-arguments.json").write_text(json.dumps(["--vst-worker", "${RESOURCES}/osprey-vst-worker"]))
+BUNDLE_WORKER
+if [ "${1:-}" = --bundle ]; then
+    echo "$app"
+    exit 0
+fi
+open "$app"

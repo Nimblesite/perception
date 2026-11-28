@@ -1,0 +1,108 @@
+name: CI
+
+# Perception builds inside an Osprey workspace [REPO-SPLIT]: ospreylang at the tag in scripts/osprey-version,
+# with this repository laid over it at the same paths (scripts/workspace.sh). The compiler is built
+# from that tag in the workspace, cached by ospreylang's own setup action. Three phases, each once:
+# build and check, the canary on Linux and macOS with line coverage, then the coverage gate.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - &checkout
+        uses: actions/checkout@v7
+        with:
+          path: .split
+          lfs: true
+      - &workspace
+        name: Lay the Osprey workspace
+        run: bash .split/scripts/workspace.sh "$GITHUB_WORKSPACE"
+      - &compiler
+        name: Build the compiler at scripts/osprey-version
+        uses: ./.github/actions/setup-osprey-compiler
+      # Every program this repository tracks compiles, with no red ([CI-PROGRAMS-COMPILE]). The
+      # workspace's index is narrowed to this repository's files, so only they are checked.
+      - name: Every program compiles
+        run: |
+          git rm -r -q --cached .
+          xargs -d "\n" git add -f -- < .split/paths
+          make _check_programs
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: src/studio/website/package-lock.json
+      - name: Website build
+        run: make -f scripts/make/perception.mk perception-website
+
+  test:
+    name: "Canary (${{ matrix.os }})"
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - *checkout
+      - *workspace
+      - *compiler
+      # The renderer bounds every host command with `timeout` (README prerequisites); macOS ships none,
+      # so only coreutils' gtimeout goes on the path under that name.
+      - name: timeout on macOS
+        if: runner.os == 'macOS'
+        run: |
+          command -v gtimeout >/dev/null || brew install coreutils
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf "$(command -v gtimeout)" "$RUNNER_TEMP/bin/timeout"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Canary (the checks ospreylang runs on every build), with line coverage
+        run: make -f scripts/make/perception.mk canary OSPREY_PREBUILT=1 PERCEPTION_COVERAGE=target/coverage/${{ matrix.os }}.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.os }}
+          path: target/coverage/
+          if-no-files-found: error
+
+  # Reads the reports the test jobs wrote; runs nothing.
+  coverage:
+    name: Coverage
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: .split
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+          path: target/coverage
+      - name: Merged coverage of this repository's files reaches scripts/coverage-thresholds.json
+        run: node .split/scripts/coverage.mjs "$GITHUB_WORKSPACE" target/coverage/*.json
+
+  # The one required check.
+  ci:
+    name: CI
+    if: always()
+    needs: [build, test, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job
+        run: test "${{ needs.build.result }}" = success && test "${{ needs.test.result }}" = success && test "${{ needs.coverage.result }}" = success

@@ -1,0 +1,8 @@
+[project]
+name = "daw"
+source_roots = ["../osprey/packages/native/host", "../synth/src", "main.ospml", "src", "../osprey/packages/signal_flow/src", "../osprey/packages/native/src", "../osprey/packages/graphics/src", "../osprey/packages/json/src"]
+default_namespace = "app"
+entry = "../osprey/packages/native/host/entry.ospml"
+
+[modules]
+allow_wildcard_imports = false

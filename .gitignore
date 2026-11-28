@@ -1,0 +1,6 @@
+/target/
+node_modules/
+.deslop/
+.commandtree/
+.sharplsp/
+/src/osprey/
