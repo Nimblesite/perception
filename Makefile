@@ -6,7 +6,7 @@ WORKSPACE ?= $(HOME)/.cache/perception/workspace
 RUN = $(MAKE) -C "$(WORKSPACE)" -f scripts/make/perception.mk
 RARE := compiler synth-proofs perception-test synth synth-headless synth-vst synth-vst-ui synth-vst-ui-headless synth-vst-spectrum synth-vst-editors daw-models daw-gpui daw-render daw-play daw-events-headless daw-playback-rate daw-profile daw-video
 
-.PHONY: help packages studio test ci website _workspace $(addprefix _,$(RARE))
+.PHONY: help packages studio lint test ci website _workspace $(addprefix _,$(RARE))
 
 ## help: List the targets.
 help:
@@ -16,11 +16,15 @@ help:
 studio: _workspace
 	$(RUN) studio
 
+## lint: Check every project with warnings as errors; one warning fails.
+lint: _workspace
+	$(RUN) lint
+
 ## test: The canary: synth package and Studio journeys, the song renderer, and the macOS host smoke.
 test: _workspace
 	$(RUN) canary
 
-## ci: The compiler at scripts/osprey-version, the canary, then the website.
+## ci: The compiler at scripts/osprey-version, lint, the canary, then the website.
 ci: _workspace
 	$(RUN) perception-ci
 

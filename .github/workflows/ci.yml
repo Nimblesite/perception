@@ -41,6 +41,9 @@ jobs:
           git rm -r -q --cached .
           xargs -d "\n" git add -f -- < .split/paths
           make _check_programs
+      # [CI-LINT] Every Perception project, with warnings as errors: one warning fails CI.
+      - name: Lint
+        run: make -f scripts/make/perception.mk lint
       - uses: actions/setup-node@v7
         with:
           node-version: "24"

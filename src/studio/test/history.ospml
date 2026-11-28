@@ -5,6 +5,7 @@ anArrangementNeedsA = "An arrangement needs a tempo of 20 to 400, a rate of 8000
 attackJson = "\"attack\":0.01"
 releaseJson = "\"release\":0.1"
 tempoJson = "\"tempo\":120.0"
+perceptionStudio = "Perception Studio"
 
 // A sine oscillator added to `driven` from the Modules palette.
 sineAdded (driven) = studioTap (studioTap (driven, "Modules"), "Add Sine oscillator")
@@ -65,7 +66,7 @@ keymapJourney () =
     keyOf ("Logic Style", "routing", "X")
     keyOf ("Logic Style", "save", "Cmd+S")
     keyOf ("Ableton Style", "timeline", "Tab")
-    keyOf ("Perception Studio", "playSong", synth::Keymaps::keys (synth::Keymaps::preset "Perception Studio", "stopSong"))
+    keyOf (perceptionStudio, "playSong", synth::Keymaps::keys (synth::Keymaps::preset perceptionStudio, "stopSong"))
     succeeds (synth::Keymaps::decode "{\"name\": \"Mine\", \"shortcuts\": {\"save\": \"Cmd+Alt+S\", \"playSong\": \"F5\", \"stopSong\": \"F5\"}}", \mine =>
         expect ([synth::Keymaps::keys (mine, "save"), synth::Keymaps::keys (mine, "open"), synth::Keymaps::keys (mine, "stopSong")], ["Cmd+Alt+S", "Cmd+O", "F5"]))
     forEachList (["{\"name\": \"Typo\", \"shortcuts\": {\"sav\": \"Cmd+S\"}}", "{\"name\": \"Clash\", \"shortcuts\": {\"save\": \"Cmd+O\"}}", "{\"shortcuts\": {\"save\": \"Cmd+S\"}}", "not json"], \text => errs (synth::Keymaps::decode text))
@@ -73,7 +74,7 @@ keymapJourney () =
     blank = synth::EditorState::initial ()
     chosen = synth::Keymaps::chosen (blank(keysPath = "${outputFolder ()}/shortcuts.json"), synth::Keymaps::preset "Logic Style")
     expect (chosen.keymap.name, "Logic Style")
-    expect ([(synth::Keymaps::stored "${outputFolder ()}/shortcuts.json").name, (synth::Keymaps::stored "${outputFolder ()}/no-such-file.json").name], ["Logic Style", "Perception Studio"])
+    expect ([(synth::Keymaps::stored "${outputFolder ()}/shortcuts.json").name, (synth::Keymaps::stored "${outputFolder ()}/no-such-file.json").name], ["Logic Style", perceptionStudio])
     succeeds (writeFile "${outputFolder ()}/bad-shortcuts.json" "{\"name\": \"Bad\", \"shortcuts\": {\"save\": \"Cmd+O\"}}", \_ => expect (true, true))
     kept = synth::Keymaps::loaded (chosen, Success(value = "${outputFolder ()}/bad-shortcuts.json"))
     expect (kept.keymap.name, "Logic Style")

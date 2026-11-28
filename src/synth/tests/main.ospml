@@ -363,7 +363,7 @@ test ("controller writes stay pending until resolved, then apply with a revision
         // A rejected receipt stays rejected.
         rejectedWith (Commands::resolve (graph, stale), synth::StaleRevision)
         // Successive writes advance the revision one at a time.
-        second = resolvesTo (graph, Commands::pending (done.snapshot, edit(value = 1760.0, revision = 1)), 2, 1760.0))))
+        resolvesTo (graph, Commands::pending (done.snapshot, edit(value = 1760.0, revision = 1)), 2, 1760.0))))
 
 test ("a rendered grain shows its window: zero ends, Hann peak, ASR sustain, short grains and block-split and control-change invariance", \() => arithmetic (\() =>
     // Each window over 16 frames, or four for the three-frame grain: zero ends, its peak or sustain, then silence.

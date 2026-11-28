@@ -4,7 +4,7 @@
 include Makefile
 DAW_MAKE = $(MAKE) -f scripts/make/perception.mk
 
-.PHONY: compiler synth-proofs perception-ci canary perception-test synth synth-headless synth-vst daw-models daw-gpui studio daw-render daw-play \
+.PHONY: compiler synth-proofs perception-ci lint canary perception-test synth synth-headless synth-vst daw-models daw-gpui studio daw-render daw-play \
 	daw-icon daw-events-headless daw-playback-rate daw-profile daw-video perception-website
 
 ## canary: Perception's major end-to-end checks, which ospreylang runs on every CI build
@@ -17,15 +17,20 @@ canary: $(if $(filter Darwin,$(UNAME_S)),_runtime_macos_arc)
 	$(BIN) test src/synth/tests$(if $(PERCEPTION_COVERAGE), --coverage-json $(basename $(PERCEPTION_COVERAGE))-synth.json)
 	$(BIN) test src/studio/test$(if $(PERCEPTION_COVERAGE), --coverage-json $(PERCEPTION_COVERAGE))
 	mkdir -p target/daw
-	$(BIN) build src/studio/render --memory=arc --quiet --no-warnings -o target/daw/daw
+	$(BIN) build src/studio/render --memory=arc --quiet -o target/daw/daw
 	$(if $(filter Darwin,$(UNAME_S)),OSPREY_BIN="$(CURDIR)/$(BIN)" bash src/studio/run.sh --smoke)
+
+## lint: Every Perception project checked with warnings as errors: one warning fails the build [CI-LINT].
+LINT_PROJECTS := src/synth src/synth/tests src/studio src/studio/render src/studio/test
+lint:
+	$(foreach project,$(LINT_PROJECTS),nice $(BIN) --check --warnings-as-errors $(project) &&) true
 
 ## compiler: The C runtime archives and the release osprey binary this product builds with.
 compiler: _runtime
 	$(COMPILER_BUILD)
 
 ## perception-ci: Every Perception check this host can run: the canary, then the website build.
-perception-ci: compiler canary perception-website
+perception-ci: compiler lint canary perception-website
 
 ## perception-test: Perception Studio, driven by accessible label, with no host. [UI-MACHINE-TEST]
 perception-test:

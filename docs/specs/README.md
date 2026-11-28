@@ -29,6 +29,10 @@ The device is compiled with the [embedded targets](https://github.com/Nimblesite
 
 - [Pocket Orchestra](orchestra/pocket-orchestra.md) [ORCHESTRA]
 
+## Continuous integration
+
+- [Lint](ci/ci.md) [CI] [CI-LINT]
+
 ## Delivery plans
 
 - [Perception Studio](../plans/studio/studio.md) · [advanced synthesis](../plans/synth/advanced.md) · [device](../plans/device/device.md) · [Pocket Orchestra](../plans/orchestra/pocket-orchestra.md)

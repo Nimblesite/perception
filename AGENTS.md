@@ -27,6 +27,7 @@
 - 1️⃣ Memory safety + security first. 0️⃣ tolerance. Attack first
 - 🛑 Osprey never panics, aborts or exits: every failure is `Result` or a handled effect. ❌ fake zero/empty values
 - 🟥 Red = fail: every tracked program compiles
+- 🧹 Run `make lint` routinely: every project checked with `--warnings-as-errors`. ⚠️ Any warning fails CI [CI-LINT]. Fix it; ❌ silence it (`--no-warnings`, `[lints]` downgrades)
 
 ## 🧪 Tests
 - ✅ E2E use-case tests: many inputs, many interactions, many assertions. Unit tests only when isolation is needed

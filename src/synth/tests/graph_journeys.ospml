@@ -1,11 +1,8 @@
 import synth::Components
 import synth::Descriptors
-import synth::Envelopes
-import synth::Filters
 import synth::Grains
 import synth::Graphs
 import synth::Observations
-import synth::Oscillators
 import synth::Parameters
 import synth::Performance
 import synth::Renderer
