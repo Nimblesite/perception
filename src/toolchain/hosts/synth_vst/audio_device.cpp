@@ -12,7 +12,6 @@
 #include <vector>
 #if defined(__APPLE__)
 #include <AudioToolbox/AudioToolbox.h>
-#include <CoreAudio/CoreAudio.h>
 #endif
 
 std::string quoted(const std::string&);
@@ -34,22 +33,6 @@ uint32_t word(const std::string& bytes, size_t at, size_t count = 4) {
     uint32_t result = 0;
     for (size_t i = 0; i < count; ++i) result |= uint32_t(uint8_t(bytes[at + i])) << (8 * i);
     return result;
-}
-
-// The default output's frames per I/O cycle and rate: the queue must outlast one cycle, so a device that pulls
-// more than the live budget at once drains it however fast the producer is [SYNTH-DEVICE-QUEUE].
-template <typename T> T outputProperty(AudioObjectPropertySelector selector) {
-    AudioObjectPropertyAddress address{kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
-                                       kAudioObjectPropertyElementMain};
-    AudioObjectID device = 0;
-    UInt32 size = sizeof device;
-    T value{};
-    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, nullptr, &size, &device) != noErr)
-        return value;
-    address.mSelector = selector;
-    size = sizeof value;
-    AudioObjectGetPropertyData(device, &address, 0, nullptr, &size, &value);
-    return value;
 }
 
 bool wave(const std::string& bytes, Wave& result) {
@@ -112,9 +95,7 @@ class Device {
         if (running) return true;
         if (!checked(AudioQueueStart(queue, nullptr), "AudioQueueStart")) return false;
         running = true;
-        std::cerr << "{\"event\":\"audio.started\",\"rate\":48000,\"channels\":" << channels
-                  << ",\"deviceBufferFrames\":" << outputProperty<UInt32>(kAudioDevicePropertyBufferFrameSize)
-                  << ",\"deviceRate\":" << outputProperty<Float64>(kAudioDevicePropertyNominalSampleRate) << "}\n";
+        std::cerr << "{\"event\":\"audio.started\",\"rate\":48000,\"channels\":" << channels << "}\n";
         return true;
     }
 
