@@ -3,7 +3,7 @@ name: CI
 # Perception builds inside an Osprey workspace [REPO-SPLIT]: ospreylang at the tag in scripts/osprey-version,
 # with this repository laid over it at the same paths (scripts/workspace.sh). The compiler is built
 # from that tag in the workspace, cached by ospreylang's own setup action. Three phases, each once:
-# build and check, the canary on Linux and macOS with line coverage, then the coverage gate.
+# build and check, the canary on Linux and macOS with line coverage plus the synthesis proofs, then the coverage gate.
 on:
   pull_request:
   push:
@@ -79,6 +79,55 @@ jobs:
           path: target/coverage/
           if-no-files-found: error
 
+  # [SYNTH-DSP-PROOFS] The synthesis theorems and the production DSP proofs, checked by the Osprey
+  # proof kernel built for gc, arc and wasm32. A cold run builds lean4export from source.
+  proofs:
+    name: "Synthesis proofs"
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WASI_SDK_VERSION: "25"
+    steps:
+      - *checkout
+      - *workspace
+      - *compiler
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install wasm-ld and a WASI sysroot
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y lld
+          curl -fsSL --retry 3 --retry-max-time 60 -o /tmp/wasi-sysroot.tar.gz \
+            "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/wasi-sysroot-${WASI_SDK_VERSION}.0.tar.gz"
+          sudo mkdir -p /opt/wasi-sdk/share/wasi-sysroot
+          sudo tar -xzf /tmp/wasi-sysroot.tar.gz -C /opt/wasi-sdk/share/wasi-sysroot --strip-components=1
+          echo "OSPREY_WASI_SYSROOT=/opt/wasi-sdk/share/wasi-sysroot" >> "$GITHUB_ENV"
+      - name: Build the wasm runtime archive
+        run: make _runtime_wasm
+      - name: Install Lean (elan, the workspace's pinned toolchain)
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain "$(cat src/toolchain/benchmarks/proof/tools/lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Restore the Lean proof tools
+        id: proof-tools
+        uses: actions/cache/restore@v4
+        with:
+          path: src/toolchain/benchmarks/proof/tools/.lake
+          key: proof-tools-${{ runner.os }}-${{ hashFiles('src/toolchain/benchmarks/proof/tools/lake-manifest.json', 'src/toolchain/benchmarks/proof/tools/lean-toolchain', 'src/toolchain/benchmarks/proof/tools/lakefile.toml') }}
+      - name: Build lean4export
+        run: cd src/toolchain/benchmarks/proof/tools && lake build lean4export
+      - name: Save the Lean proof tools
+        if: ${{ always() && steps.proof-tools.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: src/toolchain/benchmarks/proof/tools/.lake
+          key: ${{ steps.proof-tools.outputs.cache-primary-key }}
+      - name: Synthesis and production DSP proofs
+        run: make -f scripts/make/perception.mk synth-proofs
+
   # Reads the reports the test jobs wrote; runs nothing.
   coverage:
     name: Coverage
@@ -101,8 +150,8 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [build, test, coverage]
+    needs: [build, test, proofs, coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job
-        run: test "${{ needs.build.result }}" = success && test "${{ needs.test.result }}" = success && test "${{ needs.coverage.result }}" = success
+        run: test "${{ needs.build.result }}" = success && test "${{ needs.test.result }}" = success && test "${{ needs.proofs.result }}" = success && test "${{ needs.coverage.result }}" = success
