@@ -13,6 +13,7 @@
 #if defined(__APPLE__)
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreAudio/CoreAudio.h>
+#include <pthread/qos.h>
 #endif
 
 std::string quoted(const std::string&);
@@ -36,20 +37,32 @@ uint32_t word(const std::string& bytes, size_t at, size_t count = 4) {
     return result;
 }
 
-// The default output's frames per I/O cycle and rate: the queue must outlast one cycle, so a device that pulls
-// more than the live budget at once drains it however fast the producer is [SYNTH-DEVICE-QUEUE].
-template <typename T> T outputProperty(AudioObjectPropertySelector selector) {
-    AudioObjectPropertyAddress address{kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
-                                       kAudioObjectPropertyElementMain};
-    AudioObjectID device = 0;
+// The default output device. Its I/O cycle sets how much of the queue one pull takes: at 512 frames a 960-frame
+// queue keeps 9 ms of slack, so any producer pause longer than that drains it [SYNTH-DEVICE-QUEUE].
+AudioObjectPropertyAddress outputAddress(AudioObjectPropertySelector selector) {
+    return {selector, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+}
+
+AudioObjectID defaultOutput() {
+    const auto address = outputAddress(kAudioHardwarePropertyDefaultOutputDevice);
+    AudioObjectID device = kAudioObjectUnknown;
     UInt32 size = sizeof device;
+    AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, nullptr, &size, &device);
+    return device;
+}
+
+template <typename T> T outputProperty(AudioObjectPropertySelector selector) {
+    const auto address = outputAddress(selector);
     T value{};
-    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, nullptr, &size, &device) != noErr)
-        return value;
-    address.mSelector = selector;
-    size = sizeof value;
-    AudioObjectGetPropertyData(device, &address, 0, nullptr, &size, &value);
+    UInt32 size = sizeof value;
+    AudioObjectGetPropertyData(defaultOutput(), &address, 0, nullptr, &size, &value);
     return value;
+}
+
+// Pull one producer block per I/O cycle, as a DAW sets its I/O buffer: the setting is this process's own.
+OSStatus pullBlocks(UInt32 frames) {
+    const auto address = outputAddress(kAudioDevicePropertyBufferFrameSize);
+    return AudioObjectSetPropertyData(defaultOutput(), &address, 0, nullptr, sizeof frames, &frames);
 }
 
 bool wave(const std::string& bytes, Wave& result) {
@@ -82,6 +95,7 @@ class Device {
     AudioQueueRef queue = nullptr;
     static constexpr size_t MaxLivePackets = 9;
     static constexpr uint32_t LiveQueueFrames = 960; // 20 ms at 48 kHz.
+    static constexpr UInt32 IoFrames = 160;          // One Studio block per device pull.
     static constexpr uint32_t RecoveryQueueFrames = 1440;
     static constexpr uint32_t RecoveryStableFrames = Rate / 10; // 100 ms of submitted audio.
     std::array<Slot, MaxLivePackets> slots;
@@ -110,7 +124,9 @@ class Device {
 
     bool start() {
         if (running) return true;
-        if (!checked(AudioQueueStart(queue, nullptr), "AudioQueueStart")) return false;
+        if (!checked(pullBlocks(IoFrames), "Setting the output's I/O buffer") ||
+            !checked(AudioQueueStart(queue, nullptr), "AudioQueueStart"))
+            return false;
         running = true;
         std::cerr << "{\"event\":\"audio.started\",\"rate\":48000,\"channels\":" << channels
                   << ",\"deviceBufferFrames\":" << outputProperty<UInt32>(kAudioDevicePropertyBufferFrameSize)
@@ -234,6 +250,8 @@ class Device {
 
 int audioDevice() {
 #if defined(__APPLE__)
+    // The producer side feeds a 20 ms queue: at default QoS macOS coalesces its waits and throttles it under load.
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
     Device device;
     while (std::cin.peek() != std::char_traits<char>::eof()) {
         if (std::cin.peek() == '!') {

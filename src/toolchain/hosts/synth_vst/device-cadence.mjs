@@ -23,8 +23,13 @@ packet.writeUInt32LE(frames, 46);
 packet.write('data', 50);
 packet.writeUInt32LE(frames * 8, 54);
 const line = packet.toString('hex') + '\n';
-const worker = spawn(process.argv[2], ['audio-device'], { stdio: ['pipe', 'pipe', 'inherit'], timeout: 12_000 });
+const worker = spawn(process.argv[2], ['audio-device'], { stdio: ['pipe', 'pipe', 'pipe'], timeout: 12_000 });
 const exit = once(worker, 'close');
+const events = [];
+createInterface({ input: worker.stderr }).on('line', (event) => {
+  process.stderr.write(event + '\n');
+  events.push(JSON.parse(event));
+});
 const receipts = createInterface({ input: worker.stdout })[Symbol.asyncIterator]();
 async function exchange(command) {
   worker.stdin.write(command);
@@ -42,6 +47,9 @@ try {
     assert.ok(receipt.queuedFrames <= 960, 'steady playback must accept at most 20 ms ahead of a live edit');
   }
   assert.equal(receipt.emptyCallbacks, 0, 'the device ran empty with prepared audio available');
+  const started = events.find((event) => event.event === 'audio.started');
+  assert.equal(started.deviceBufferFrames, frames, 'the device pulls one producer block per I/O cycle');
+  assert.equal(started.deviceRate, 48_000);
   const deadline = performance.now() + 3_000;
   do {
     receipt = await exchange('!status\n');
